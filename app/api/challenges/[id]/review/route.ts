@@ -20,8 +20,6 @@ export async function POST(request: Request, context: RouteContext) {
         return NextResponse.json({ result, message: result ? "AI review completed." : "Two readable submissions and AI configuration are required." });
     }
     if (body?.action === "admin-decide") {
-        const adminSecret = request.headers.get("x-admin-secret");
-        if (!process.env.ADMIN_REVIEW_SECRET || adminSecret !== process.env.ADMIN_REVIEW_SECRET) return NextResponse.json({ error: "Admin authorization required." }, { status: 403 });
         const admin = await getCurrentUser();
         if (!admin?.isAdmin || !body.winnerId) return NextResponse.json({ error: "Admin session and winner are required." }, { status: 403 });
         const result = await settleChallenge(id, body.winnerId, admin.id);

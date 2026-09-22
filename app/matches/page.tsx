@@ -27,7 +27,14 @@ export default function MatchesPage() {
             const data = await response.json();
             setCurrentUserId(data.user.id);
         });
-        void loadMatches();
+        void fetch("/api/challenges?mine=true").then(async (response) => {
+            const data = await response.json();
+            if (!response.ok) {
+                setError(data.error || "Could not load your matches.");
+                return;
+            }
+            setMatches(data.challenges);
+        });
     }, []);
 
     async function submitEvidence(matchId: string, event: React.ChangeEvent<HTMLInputElement>) {

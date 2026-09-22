@@ -2,20 +2,20 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "../../../lib/server-auth";
 import { prisma } from "../../../lib/prisma";
 
-async function requireAdmin(request: Request) {
+async function requireAdmin() {
     const admin = await getCurrentUser();
-    if (!admin?.isAdmin || request.headers.get("x-admin-secret") !== process.env.ADMIN_REVIEW_SECRET) return null;
+    if (!admin?.isAdmin) return null;
     return admin;
 }
 
-export async function GET(request: Request) {
-    if (!(await requireAdmin(request))) return NextResponse.json({ error: "Admin authorization required." }, { status: 403 });
+export async function GET() {
+    if (!(await requireAdmin())) return NextResponse.json({ error: "Admin authorization required." }, { status: 403 });
     const transactions = await prisma.walletTransaction.findMany({ where: { status: "PENDING" }, include: { user: { select: { id: true, username: true, email: true, walletBalance: true } } }, orderBy: { createdAt: "asc" } });
     return NextResponse.json({ transactions });
 }
 
 export async function POST(request: Request) {
-    const admin = await requireAdmin(request);
+    const admin = await requireAdmin();
     if (!admin) return NextResponse.json({ error: "Admin authorization required." }, { status: 403 });
     const body = await request.json().catch(() => null) as { transactionId?: string; action?: string; providerRef?: string } | null;
     if (!body?.transactionId || !["approve", "reject"].includes(body.action || "")) return NextResponse.json({ error: "Transaction and approve/reject action are required." }, { status: 400 });

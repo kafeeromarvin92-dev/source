@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { getCurrentUser } from "../../../lib/server-auth";
 import { prisma } from "../../../lib/prisma";
 
@@ -20,7 +21,7 @@ export async function PATCH(_request: Request, context: RouteContext) {
     if (!challenge || challenge.status !== "OPEN" || challenge.creatorId === user.id) return NextResponse.json({ error: "Challenge is no longer available." }, { status: 409 });
     let acceptedChallenge: Awaited<ReturnType<typeof prisma.challenge.update>> | null;
     try {
-        acceptedChallenge = await prisma.$transaction(async (transaction: Parameters<typeof prisma.$transaction>[0] extends (tx: infer T) => any ? T : never) => {
+        acceptedChallenge = await prisma.$transaction(async (transaction: Prisma.TransactionClient) => {
         const [creator, accepter] = await Promise.all([
             transaction.user.findUnique({ where: { id: challenge.creatorId } }),
             transaction.user.findUnique({ where: { id: user.id } }),

@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { getStoredUser } from "../lib/auth";
 
 const navItems = [
     { href: "/", label: "lobby" },
@@ -13,11 +15,22 @@ const navItems = [
 ];
 export default function BottomNav() {
     const pathname = usePathname();
+    const [isAdmin, setIsAdmin] = useState(Boolean(getStoredUser()?.isAdmin));
+
+    useEffect(() => {
+        fetch("/api/auth/me").then(async (response) => {
+            if (!response.ok) return;
+            const data = await response.json();
+            setIsAdmin(Boolean(data.user?.isAdmin));
+        });
+    }, []);
+
+    const visibleItems = isAdmin ? [...navItems, { href: "/admin", label: "Admin" }] : navItems;
 
     return (
         <nav className="fixed bottom-0 left-0 right-0 z-50 bg-navy-900 border-t border-navy-700">
             <div className="max-w-lg mx-auto flex justify-around py-3">
-                {navItems.map((item) => {
+                {visibleItems.map((item) => {
                     const isActive = pathname === item.href;
                     return (
                         <Link

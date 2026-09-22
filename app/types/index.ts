@@ -4,6 +4,7 @@ export interface User {
     teamName?: string;
     email?: string;
     avatar: string;
+    isAdmin?: boolean;
     createdAt?: string;
     walletBalance: number;
     totalWins: number;

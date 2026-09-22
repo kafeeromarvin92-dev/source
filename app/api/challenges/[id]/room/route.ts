@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { getCurrentUser } from "../../../../lib/server-auth";
 import { prisma } from "../../../../lib/prisma";
 import { runAiReview } from "../../../../lib/adjudication";
@@ -36,12 +37,14 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json({ room: updated ? formatRoom(updated) : null });
 }
 
-function formatRoom(room: any) {
+type MatchRoom = Prisma.ChallengeGetPayload<{ include: { creator: true; acceptedBy: true; messages: { include: { sender: true } }; codes: true; submissions: { include: { player: true } }; decision: true; objections: true } }>;
+
+function formatRoom(room: MatchRoom) {
     return {
         challenge: { ...room, status: room.status.toLowerCase(), isPrivate: true },
-        messages: room.messages.map((message: any) => ({ id: message.id, senderId: message.senderId, senderName: message.sender.username, text: message.text, createdAt: message.createdAt })),
-        playerCodes: Object.fromEntries(room.codes.map((code: any) => [code.playerId, code.code])),
-        submissions: Object.fromEntries(room.submissions.map((submission: any) => [submission.playerId, { playerName: submission.player.username, image: submission.image, submittedAt: submission.createdAt }])),
+        messages: room.messages.map((message) => ({ id: message.id, senderId: message.senderId, senderName: message.sender.username, text: message.text, createdAt: message.createdAt })),
+        playerCodes: Object.fromEntries(room.codes.map((code) => [code.playerId, code.code])),
+        submissions: Object.fromEntries(room.submissions.map((submission) => [submission.playerId, { playerName: submission.player.username, image: submission.image, submittedAt: submission.createdAt }])) ,
         decision: room.decision,
         objections: room.objections,
     };

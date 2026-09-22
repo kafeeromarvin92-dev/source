@@ -6,6 +6,13 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Challenge, MatchRoom } from "../../types";
 
+function formatChallengeCode(id: string | undefined) {
+    if (!id) return "INV1";
+    const letters = id.replace(/[^a-z]/gi, "").toUpperCase().padEnd(3, "X").slice(-3);
+    const number = id.split("").reduce((total, character) => total + character.charCodeAt(0), 0) % 10;
+    return `${letters}${number}`;
+}
+
 export default function MatchInvitePage() {
     const params = useParams<{ id: string }>();
     const router = useRouter();
@@ -16,7 +23,7 @@ export default function MatchInvitePage() {
     const [message, setMessage] = useState("");
     const [code, setCode] = useState("");
     const [submitting, setSubmitting] = useState(false);
-    const challengeCode = params.id?.slice(-6).toUpperCase() || "INVITE";
+    const challengeCode = formatChallengeCode(params.id);
 
     async function loadRoom() {
         const response = await fetch(`/api/challenges/${params.id}/room`);
@@ -84,6 +91,7 @@ export default function MatchInvitePage() {
             });
             const data = await response.json();
             if (response.ok) setRoom(data.room);
+            else setError(data.error || "Could not submit the screenshot.");
             setSubmitting(false);
         };
         reader.readAsDataURL(file);
@@ -121,7 +129,7 @@ export default function MatchInvitePage() {
                     <div className="flex gap-2"><input value={code} onChange={(event) => setCode(event.target.value)} placeholder="Enter your DLS code" className="min-w-0 flex-1 bg-navy-700 rounded-xl px-3 py-2" /><button onClick={() => { void sendRoomAction("code", code); setCode(""); }} className="bg-gold text-navy-950 font-bold px-4 rounded-xl">Share</button></div>
                     <div className="space-y-1">{Object.entries(room?.playerCodes || {}).map(([playerId, playerCode]) => <p key={playerId} className="text-sm text-green-300">Code received: {playerCode}</p>)}</div>
                 </div>
-                <div className="bg-navy-800 border border-navy-700 rounded-2xl p-4 space-y-3"><h2 className="font-bold">Submit match result</h2><p className="text-xs text-slate-400">After the match, upload the final score screenshot. Both submissions go to review.</p><label className="block text-center bg-gold text-navy-950 font-bold py-3 rounded-xl cursor-pointer">{submitting ? "Uploading..." : "Upload result screenshot"}<input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={submitEvidence} /></label>{Object.values(room?.submissions || {}).map((submission) => <div key={submission.submittedAt} className="flex items-center gap-3 text-sm text-green-300"><img src={submission.image} alt={`${submission.playerName} result`} className="w-12 h-12 rounded-lg object-cover" />{submission.playerName} submitted evidence</div>)}</div>
+                <div className="bg-navy-800 border border-gold/30 rounded-2xl p-4 space-y-3"><h2 className="font-bold">Submit match result</h2><p className="text-xs text-slate-400">After the match, upload the final score screenshot. Both submissions go to review.</p><label className="block text-center bg-gold text-navy-950 font-bold py-3 rounded-xl cursor-pointer">{submitting ? "Uploading..." : "Upload result screenshot"}<input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={submitEvidence} /></label>{Object.values(room?.submissions || {}).map((submission) => <div key={submission.submittedAt} className="flex items-center gap-3 text-sm text-green-300"><img src={submission.image} alt={`${submission.playerName} result`} className="w-12 h-12 rounded-lg object-cover" />{submission.playerName} submitted evidence</div>)}</div>
             </section>}
             <p className="text-center text-xs text-slate-500">Only accept challenges from people you know.</p>
         </div>

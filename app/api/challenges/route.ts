@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { getCurrentUser } from "../../lib/server-auth";
 import { prisma } from "../../lib/prisma";
 
@@ -14,7 +15,7 @@ export async function GET(request: Request) {
         include: { creator: { select: userSelect }, acceptedBy: { select: userSelect }, decision: true },
         orderBy: { createdAt: "desc" },
     });
-    return NextResponse.json({ challenges: challenges.map((challenge: any) => ({ ...challenge, status: challenge.status.toLowerCase(), isPrivate: true, creator: challenge.creator, acceptedBy: challenge.acceptedBy })) });
+    return NextResponse.json({ challenges: challenges.map((challenge: Prisma.ChallengeGetPayload<{ include: { creator: { select: typeof userSelect }; acceptedBy: { select: typeof userSelect }; decision: true } }>) => ({ ...challenge, status: challenge.status.toLowerCase(), isPrivate: true, creator: challenge.creator, acceptedBy: challenge.acceptedBy })) });
 }
 
 export async function POST(request: Request) {

@@ -16,6 +16,7 @@ export async function GET() {
         teamName: user.teamName,
         email: user.email,
         avatar: user.avatar,
+        isAdmin: user.isAdmin,
         walletBalance: user.walletBalance,
         totalWins: wins,
         totalMatches: matches,
