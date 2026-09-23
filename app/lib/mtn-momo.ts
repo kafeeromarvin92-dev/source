@@ -1,4 +1,4 @@
-const defaultBaseUrl = "https://dev-appx.developers.mtn.com";
+const defaultBaseUrl = "https://api.mtn.com/v1";
 
 type MtnResponse = Record<string, unknown>;
 
@@ -18,7 +18,7 @@ function getConfig() {
     return {
         consumerKey,
         consumerSecret,
-        baseUrl: (process.env.MTN_PAYMENTS_BASE_URL || defaultBaseUrl).replace(/\/$/, ""),
+        baseUrl: (process.env.MTN_API_BASE_URL || process.env.MTN_PAYMENTS_BASE_URL || defaultBaseUrl).replace(/\/$/, ""),
     };
 }
 
@@ -26,7 +26,7 @@ export async function getMtnAccessToken() {
     const config = getConfig();
     if (cachedToken && cachedToken.expiresAt > Date.now() + 30_000) return { ...config, token: cachedToken.value };
 
-    const response = await fetch(`${config.baseUrl}/api/oauth/token`, {
+    const response = await fetch(`${config.baseUrl}/oauth/access_token`, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({ grant_type: "client_credentials", client_id: config.consumerKey, client_secret: config.consumerSecret }),
@@ -47,7 +47,7 @@ function getErrorMessage(data: MtnResponse) {
 export async function requestMtnPayment(input: { reference: string; phoneNumber: string; amount: number; description: string }) {
     const config = await getMtnAccessToken();
     const providerReference = crypto.randomUUID();
-    const response = await fetch(`${config.baseUrl}/api/payments/v1/requesttopay`, {
+    const response = await fetch(`${config.baseUrl}/payments/v1/requesttopay`, {
         method: "POST",
         headers: {
             Authorization: `Bearer ${config.token}`,
@@ -73,7 +73,7 @@ export async function requestMtnPayment(input: { reference: string; phoneNumber:
 
 export async function getMtnPaymentStatus(reference: string) {
     const config = await getMtnAccessToken();
-    const response = await fetch(`${config.baseUrl}/api/payments/v1/requesttopay/${encodeURIComponent(reference)}`, {
+    const response = await fetch(`${config.baseUrl}/payments/v1/requesttopay/${encodeURIComponent(reference)}`, {
         headers: {
             Authorization: `Bearer ${config.token}`,
         },
