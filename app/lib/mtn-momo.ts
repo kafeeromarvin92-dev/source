@@ -26,10 +26,10 @@ export async function getMtnAccessToken() {
     const config = getConfig();
     if (cachedToken && cachedToken.expiresAt > Date.now() + 30_000) return { ...config, token: cachedToken.value };
 
-    const response = await fetch(`${config.baseUrl}/oauth/access_token`, {
+    const response = await fetch(`${config.baseUrl}/oauth/access_token?grant_type=client_credentials`, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ grant_type: "client_credentials", client_id: config.consumerKey, client_secret: config.consumerSecret }),
+        body: new URLSearchParams({ client_id: config.consumerKey, client_secret: config.consumerSecret }),
         cache: "no-store",
     });
     const data = await response.json().catch(() => ({})) as MtnResponse;
