@@ -34,7 +34,7 @@ export async function getMtnAccessToken() {
     });
     const data = await response.json().catch(() => ({})) as MtnResponse;
     const token = typeof data.access_token === "string" ? data.access_token : null;
-    if (!response.ok || !token) throw new MtnMomoError(response.status, "MTN access token request failed.");
+    if (!response.ok || !token) throw new MtnMomoError(response.status, `MTN access token request failed: ${getErrorMessage(data)}`);
     const expiresIn = typeof data.expires_in === "number" ? data.expires_in : 3_600;
     cachedToken = { value: token, expiresAt: Date.now() + expiresIn * 1_000 };
     return { ...config, token };
