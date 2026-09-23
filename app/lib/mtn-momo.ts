@@ -41,7 +41,9 @@ export async function getMtnAccessToken() {
 }
 
 function getErrorMessage(data: MtnResponse) {
-    return [data.message, data.error, data.detail, data.error_description].find((value): value is string => typeof value === "string" && value.length > 0) || "MTN rejected the payment request.";
+    const message = [data.message, data.error_description, data.error, data.detail, data.errorCode, data.error_code]
+        .find((value): value is string => typeof value === "string" && value.length > 0);
+    return message || (Object.keys(data).length > 0 ? JSON.stringify(data).slice(0, 200) : "MTN rejected the payment request.");
 }
 
 export async function requestMtnPayment(input: { reference: string; phoneNumber: string; amount: number; description: string }) {
