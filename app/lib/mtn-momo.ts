@@ -1,5 +1,4 @@
-const defaultBaseUrl = "https://sandbox.momodeveloper.mtn.com";
-const defaultTargetEnvironment = "sandbox";
+const defaultBaseUrl = "https://dev-appx.developers.mtn.com";
 
 type MtnResponse = Record<string, unknown>;
 
@@ -13,31 +12,24 @@ export class MtnMomoError extends Error {
 let cachedToken: { value: string; expiresAt: number } | null = null;
 
 function getConfig() {
-    const subscriptionKey = process.env.MTN_MOMO_SUBSCRIPTION_KEY;
-    const apiUser = process.env.MTN_MOMO_API_USER;
-    const apiKey = process.env.MTN_MOMO_API_KEY;
-    if (!subscriptionKey || !apiUser || !apiKey) throw new Error("MTN_MOMO_NOT_CONFIGURED");
+    const consumerKey = process.env.MTN_CONSUMER_KEY;
+    const consumerSecret = process.env.MTN_CONSUMER_SECRET;
+    if (!consumerKey || !consumerSecret) throw new Error("MTN_PAYMENTS_NOT_CONFIGURED");
     return {
-        subscriptionKey,
-        apiUser,
-        apiKey,
-        baseUrl: (process.env.MTN_MOMO_BASE_URL || defaultBaseUrl).replace(/\/$/, ""),
-        targetEnvironment: process.env.MTN_MOMO_TARGET_ENVIRONMENT || defaultTargetEnvironment,
+        consumerKey,
+        consumerSecret,
+        baseUrl: (process.env.MTN_PAYMENTS_BASE_URL || defaultBaseUrl).replace(/\/$/, ""),
     };
 }
 
-async function getAccessToken() {
+export async function getMtnAccessToken() {
     const config = getConfig();
     if (cachedToken && cachedToken.expiresAt > Date.now() + 30_000) return { ...config, token: cachedToken.value };
 
-    const response = await fetch(`${config.baseUrl}/collection/token/`, {
+    const response = await fetch(`${config.baseUrl}/api/oauth/token`, {
         method: "POST",
-        headers: {
-            Authorization: `Basic ${Buffer.from(`${config.apiUser}:${config.apiKey}`).toString("base64")}`,
-            "Ocp-Apim-Subscription-Key": config.subscriptionKey,
-            "Content-Type": "application/json",
-        },
-        body: "{}",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ grant_type: "client_credentials", client_id: config.consumerKey, client_secret: config.consumerSecret }),
         cache: "no-store",
     });
     const data = await response.json().catch(() => ({})) as MtnResponse;
@@ -49,19 +41,17 @@ async function getAccessToken() {
 }
 
 function getErrorMessage(data: MtnResponse) {
-    return [data.message, data.error, data.detail].find((value): value is string => typeof value === "string" && value.length > 0) || "MTN rejected the payment request.";
+    return [data.message, data.error, data.detail, data.error_description].find((value): value is string => typeof value === "string" && value.length > 0) || "MTN rejected the payment request.";
 }
 
 export async function requestMtnPayment(input: { reference: string; phoneNumber: string; amount: number; description: string }) {
-    const config = await getAccessToken();
+    const config = await getMtnAccessToken();
     const providerReference = crypto.randomUUID();
-    const response = await fetch(`${config.baseUrl}/collection/v1_0/requesttopay`, {
+    const response = await fetch(`${config.baseUrl}/api/payments/v1/requesttopay`, {
         method: "POST",
         headers: {
             Authorization: `Bearer ${config.token}`,
             "X-Reference-Id": providerReference,
-            "X-Target-Environment": config.targetEnvironment,
-            "Ocp-Apim-Subscription-Key": config.subscriptionKey,
             "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -82,12 +72,10 @@ export async function requestMtnPayment(input: { reference: string; phoneNumber:
 }
 
 export async function getMtnPaymentStatus(reference: string) {
-    const config = await getAccessToken();
-    const response = await fetch(`${config.baseUrl}/collection/v1_0/requesttopay/${encodeURIComponent(reference)}`, {
+    const config = await getMtnAccessToken();
+    const response = await fetch(`${config.baseUrl}/api/payments/v1/requesttopay/${encodeURIComponent(reference)}`, {
         headers: {
             Authorization: `Bearer ${config.token}`,
-            "X-Target-Environment": config.targetEnvironment,
-            "Ocp-Apim-Subscription-Key": config.subscriptionKey,
         },
         cache: "no-store",
     });

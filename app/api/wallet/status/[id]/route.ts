@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getMtnPaymentStatus, MtnMomoError } from "../../../../lib/mtn-momo";
 import { getCurrentUser } from "../../../../lib/server-auth";
 import { prisma } from "../../../../lib/prisma";
+import { settleMtnTransaction } from "../../../../lib/mtn-settlement";
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
     const user = await getCurrentUser();
@@ -14,12 +15,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     try {
         const payment = await getMtnPaymentStatus(transaction.providerRef);
         if (payment.status === "SUCCESSFUL") {
-            const completed = await prisma.$transaction(async (database) => {
-                const pending = await database.walletTransaction.findFirst({ where: { id, userId: user.id, status: "PENDING" } });
-                if (!pending) return database.walletTransaction.findUniqueOrThrow({ where: { id } });
-                await database.user.update({ where: { id: user.id }, data: { walletBalance: { increment: pending.amount } } });
-                return database.walletTransaction.update({ where: { id }, data: { status: "COMPLETED" } });
-            });
+            const completed = await settleMtnTransaction(id, payment.status);
             return NextResponse.json({ transaction: completed });
         }
         if (payment.status === "FAILED" || payment.status === "REJECTED") {

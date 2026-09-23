@@ -36,7 +36,7 @@ export async function POST(request: Request) {
         const providerStatus = paymentError instanceof MtnMomoError ? paymentError.status : null;
         console.error("MTN MoMo payment request failed", { transactionId: transaction.id, status: providerStatus, message: providerMessage });
         await prisma.walletTransaction.update({ where: { id: transaction.id }, data: { status: "REJECTED", providerRef: providerMessage } });
-        if (paymentError instanceof Error && paymentError.message === "MTN_MOMO_NOT_CONFIGURED") return NextResponse.json({ error: "MTN MoMo is not configured. Add MTN_MOMO_SUBSCRIPTION_KEY, MTN_MOMO_API_USER, and MTN_MOMO_API_KEY." }, { status: 503 });
+        if (paymentError instanceof Error && paymentError.message === "MTN_PAYMENTS_NOT_CONFIGURED") return NextResponse.json({ error: "MTN Payments V1 is not configured. Add MTN_CONSUMER_KEY and MTN_CONSUMER_SECRET." }, { status: 503 });
         return NextResponse.json({ error: `MTN rejected the request${providerStatus ? ` (HTTP ${providerStatus})` : ""}: ${providerMessage}` }, { status: 502 });
     }
 }
