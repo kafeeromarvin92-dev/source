@@ -17,11 +17,12 @@ export async function POST(request: Request) {
     if (!user) return NextResponse.json({ error: "Log in to use your wallet." }, { status: 401 });
     const body = await request.json().catch(() => null) as { action?: string; amount?: number; phoneNumber?: string; provider?: string } | null;
     const amount = Number(body?.amount);
-    const phoneNumber = typeof body?.phoneNumber === "string" ? body.phoneNumber.trim() : "";
+    const submittedPhone = typeof body?.phoneNumber === "string" ? body.phoneNumber.trim() : "";
+    const phoneNumber = submittedPhone.replace(/[\s-]/g, "").replace(/^0(7\d{8})$/, "+256$1");
     const provider = typeof body?.provider === "string" ? body.provider.trim().toUpperCase() : "";
-    if (!Number.isInteger(amount) || amount < 500 || amount > 1_000_000 || !/^\+?256\d{9}$/.test(phoneNumber) || !providers.has(provider)) {
-        return NextResponse.json({ error: "Use a valid amount, Ugandan MTN number, and MTN provider." }, { status: 400 });
-    }
+    if (!Number.isInteger(amount) || amount < 500 || amount > 1_000_000) return NextResponse.json({ error: "Amount must be a whole number between 500 and 1,000,000 UGX." }, { status: 400 });
+    if (!/^\+?2567\d{8}$/.test(phoneNumber)) return NextResponse.json({ error: "Use a valid Ugandan MTN mobile number, for example +256784261689." }, { status: 400 });
+    if (!providers.has(provider)) return NextResponse.json({ error: "Select MTN as the payment provider." }, { status: 400 });
     if (body?.action === "withdraw" && amount > user.walletBalance) return NextResponse.json({ error: "Your wallet balance is too low for this withdrawal." }, { status: 400 });
     if (body?.action !== "deposit" && body?.action !== "withdraw") return NextResponse.json({ error: "Choose deposit or withdraw." }, { status: 400 });
     const transaction = await prisma.walletTransaction.create({ data: { userId: user.id, type: body.action.toUpperCase(), amount, phoneNumber, provider } });
