@@ -16,6 +16,9 @@ export async function POST(request: Request, context: RouteContext) {
     const { id } = await context.params;
     const body = await request.json().catch(() => null) as { action?: string; winnerId?: string } | null;
     if (body?.action === "analyze") {
+        const challenge = await prisma.challenge.findUnique({ where: { id }, select: { game: true } });
+        if (!challenge) return NextResponse.json({ error: "Challenge not found." }, { status: 404 });
+        if (challenge.game === "EFOOTBALL") return NextResponse.json({ result: null, message: "AI review is not enabled for eFootball yet. An admin will review the screenshots." });
         const result = await runAiReview(id);
         return NextResponse.json({ result, message: result ? "AI review completed." : "Two readable submissions and AI configuration are required." });
     }

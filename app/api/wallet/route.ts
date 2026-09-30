@@ -3,7 +3,7 @@ import { MtnMomoError, requestMtnPayment } from "../../lib/mtn-momo";
 import { getCurrentUser } from "../../lib/server-auth";
 import { prisma } from "../../lib/prisma";
 
-const providers = new Set(["MTN"]);
+const providers = new Set(["MTN", "AIRTEL"]);
 
 export async function GET() {
     const user = await getCurrentUser();
@@ -21,11 +21,12 @@ export async function POST(request: Request) {
     const phoneNumber = submittedPhone.replace(/[\s-]/g, "").replace(/^0(7\d{8})$/, "+256$1");
     const provider = typeof body?.provider === "string" ? body.provider.trim().toUpperCase() : "";
     if (!Number.isInteger(amount) || amount < 500 || amount > 1_000_000) return NextResponse.json({ error: "Amount must be a whole number between 500 and 1,000,000 UGX." }, { status: 400 });
-    if (!/^\+?2567\d{8}$/.test(phoneNumber)) return NextResponse.json({ error: "Use a valid Ugandan MTN mobile number, for example +256784261689." }, { status: 400 });
-    if (!providers.has(provider)) return NextResponse.json({ error: "Select MTN as the payment provider." }, { status: 400 });
+    if (!/^\+?2567\d{8}$/.test(phoneNumber)) return NextResponse.json({ error: "Use a valid Ugandan mobile number, for example +256784261689." }, { status: 400 });
+    if (!providers.has(provider)) return NextResponse.json({ error: "Select Airtel Money or MTN MoMo as the payment provider." }, { status: 400 });
     if (body?.action === "withdraw" && amount > user.walletBalance) return NextResponse.json({ error: "Your wallet balance is too low for this withdrawal." }, { status: 400 });
     if (body?.action !== "deposit" && body?.action !== "withdraw") return NextResponse.json({ error: "Choose deposit or withdraw." }, { status: 400 });
-    const transaction = await prisma.walletTransaction.create({ data: { userId: user.id, type: body.action.toUpperCase(), amount, phoneNumber, provider } });
+    if (body.action === "deposit" && provider === "AIRTEL") return NextResponse.json({ error: "Airtel deposits are not active yet. KBet payment API setup is required." }, { status: 503 });
+    const transaction = await prisma.walletTransaction.create({ data: { userId: user.id, type: body.action.toUpperCase(), amount, phoneNumber, provider: body.action === "withdraw" ? provider : "MTN_MOMO" } });
     if (body.action === "withdraw") return NextResponse.json({ transaction, message: "Withdrawal request recorded for admin review." }, { status: 201 });
 
     try {

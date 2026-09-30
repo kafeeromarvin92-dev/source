@@ -98,17 +98,20 @@ export default function MatchInvitePage() {
     }
 
     const stake = challenge?.stakeAmount || 0;
+    const gameLabel = challenge?.game === "EFOOTBALL" ? "eFootball" : "DLS";
 
     return (
         <div className="px-4 pt-6 space-y-6">
             <Link href="/" className="text-gold text-sm">Back to lobby</Link>
             <div className="text-center pt-5">
                 <div className="text-6xl mb-4">⚽</div>
-                <p className="text-gold text-sm font-bold uppercase tracking-wider">Private challenge</p>
+                <p className="text-gold text-sm font-bold uppercase tracking-wider">{gameLabel} challenge</p>
                 <h1 className="text-3xl font-extrabold mt-2">You have been challenged</h1>
                 <p className="text-slate-400 mt-2">A friend wants to settle this on the pitch.</p>
             </div>
             <div className="bg-navy-800 border border-gold/30 rounded-2xl p-5 text-center">
+                <p className="text-sm text-slate-400">Game</p>
+                <p className="font-bold text-gold">{gameLabel}</p>
                 <p className="text-sm text-slate-400">Entry stake</p>
                 <p className="text-4xl font-extrabold text-gold mt-1">{stake.toLocaleString()} <span className="text-lg">UGX</span></p>
                 <div className="grid grid-cols-2 gap-3 mt-5 text-left">
@@ -126,7 +129,7 @@ export default function MatchInvitePage() {
                 <div className="bg-navy-800 border border-navy-700 rounded-2xl p-4 space-y-3">
                     <h2 className="font-bold">Exchange game codes</h2>
                     <p className="text-xs text-slate-400">Share the code your opponent needs to find you in the game.</p>
-                    <div className="flex gap-2"><input value={code} onChange={(event) => setCode(event.target.value)} placeholder="Enter your DLS code" className="min-w-0 flex-1 bg-navy-700 rounded-xl px-3 py-2" /><button onClick={() => { void sendRoomAction("code", code); setCode(""); }} className="bg-gold text-navy-950 font-bold px-4 rounded-xl">Share</button></div>
+                    <div className="flex gap-2"><input value={code} onChange={(event) => setCode(event.target.value)} placeholder={`Enter your ${gameLabel} code`} className="min-w-0 flex-1 bg-navy-700 rounded-xl px-3 py-2" /><button onClick={() => { void sendRoomAction("code", code); setCode(""); }} className="bg-gold text-navy-950 font-bold px-4 rounded-xl">Share</button></div>
                     <div className="space-y-1">{Object.entries(room?.playerCodes || {}).map(([playerId, playerCode]) => <p key={playerId} className="text-sm text-green-300">Code received: {playerCode}</p>)}</div>
                 </div>
                 <div className="bg-navy-800 border border-gold/30 rounded-2xl p-4 space-y-3"><h2 className="font-bold">Submit match result</h2><p className="text-xs text-slate-400">After the match, upload the final score screenshot. Both submissions go to review.</p><label className="block text-center bg-gold text-navy-950 font-bold py-3 rounded-xl cursor-pointer">{submitting ? "Uploading..." : "Upload result screenshot"}<input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={submitEvidence} /></label>{Object.values(room?.submissions || {}).map((submission) => <div key={submission.submittedAt} className="flex items-center gap-3 text-sm text-green-300"><img src={submission.image} alt={`${submission.playerName} result`} className="w-12 h-12 rounded-lg object-cover" />{submission.playerName} submitted evidence</div>)}</div>

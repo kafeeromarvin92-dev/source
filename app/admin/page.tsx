@@ -14,9 +14,11 @@ type Transaction = {
 
 type Review = {
     id: string;
+    game: "DLS" | "EFOOTBALL";
     creator: { id: string; username: string; teamName: string };
     acceptedBy: { id: string; username: string; teamName: string } | null;
     submissions: { id: string; playerId: string; image: string; player: { username: string; teamName: string } }[];
+    decision: { winnerId: string | null; confidence: number | null; reasoning: string | null; creatorScore: number | null; acceptedByScore: number | null } | null;
 };
 
 export default function AdminPage() {
@@ -105,8 +107,11 @@ export default function AdminPage() {
                 {reviews.map((review) => (
                     <article key={review.id} className="bg-navy-800 border border-gold/30 rounded-2xl p-4 space-y-3">
                         <p className="font-bold">{review.creator.teamName || review.creator.username} vs {review.acceptedBy?.teamName || review.acceptedBy?.username || "Opponent"}</p>
+                        <p className="text-sm text-gold">{review.game === "EFOOTBALL" ? "eFootball" : "DLS"} · AI {review.decision?.winnerId ? `suggests ${review.decision.winnerId === review.creator.id ? review.creator.teamName || review.creator.username : review.acceptedBy?.teamName || review.acceptedBy?.username || "Opponent"} (${review.decision.confidence ?? 0}% confidence)` : "has no confirmed winner"}</p>
+                        {review.decision?.creatorScore != null && review.decision.acceptedByScore != null && <p className="text-sm">AI read: {review.creator.teamName || review.creator.username} {review.decision.creatorScore} - {review.acceptedBy?.teamName || review.acceptedBy?.username || "Opponent"} {review.decision.acceptedByScore}</p>}
+                        {review.decision?.reasoning && <p className="text-xs text-slate-400">{review.decision.reasoning}</p>}
                         <div className="grid grid-cols-2 gap-2">
-                            {review.submissions.map((submission) => <button key={submission.id} type="button" onClick={() => { void decideReview(review, submission.playerId); }} className="text-left space-y-2"><img src={submission.image} alt={`${submission.player.teamName || submission.player.username} submitted score`} className="w-full aspect-square object-cover rounded-xl border border-navy-600" /><span className="block text-sm text-gold">Select {submission.player.teamName || submission.player.username}</span></button>)}
+                            {review.submissions.map((submission) => <button key={submission.id} type="button" onClick={() => { void decideReview(review, submission.playerId); }} className="text-left space-y-2"><img src={submission.image} alt={`${submission.player.teamName || submission.player.username} submitted score`} className="w-full aspect-video object-contain bg-navy-950 rounded-xl border border-navy-600" /><span className="block text-sm text-gold">Select {submission.player.teamName || submission.player.username}</span></button>)}
                         </div>
                     </article>
                 ))}

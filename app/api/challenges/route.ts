@@ -23,12 +23,14 @@ export async function POST(request: Request) {
     if (!user) return NextResponse.json({ error: "Log in before creating a challenge." }, { status: 401 });
     const body = await request.json().catch(() => null);
     const stakeAmount = Number(body?.stakeAmount);
+    const game = body?.game === undefined ? "DLS" : body.game;
 
     if (![500, 1000, 2000, 5000].includes(stakeAmount)) {
         return NextResponse.json({ error: "Choose a valid stake amount." }, { status: 400 });
     }
+    if (game !== "DLS" && game !== "EFOOTBALL") return NextResponse.json({ error: "Choose DLS or eFootball." }, { status: 400 });
 
-    const challenge = await prisma.challenge.create({ data: { stakeAmount, creatorId: user.id }, include: { creator: { select: userSelect } } });
+    const challenge = await prisma.challenge.create({ data: { stakeAmount, game, creatorId: user.id }, include: { creator: { select: userSelect } } });
 
     return NextResponse.json({ challenge: { ...challenge, status: "open", isPrivate: true } }, { status: 201 });
 }

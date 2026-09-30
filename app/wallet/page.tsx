@@ -6,7 +6,7 @@ export default function WalletPage() {
     const [balance, setBalance] = useState(0);
     const [amount, setAmount] = useState("500");
     const [phoneNumber, setPhoneNumber] = useState("+256");
-    const [provider] = useState("MTN");
+    const [provider, setProvider] = useState("MTN");
     const [action, setAction] = useState<"deposit" | "withdraw">("deposit");
     const [message, setMessage] = useState("");
     const [error, setError] = useState("");
@@ -30,7 +30,7 @@ export default function WalletPage() {
             return;
         }
         setMessage(data.message);
-        if (data.transaction?.id) {
+        if (action === "deposit" && data.transaction?.id) {
             const transactionId = data.transaction.id as string;
             const poll = window.setInterval(async () => {
                 const statusResponse = await fetch(`/api/wallet/status/${transactionId}`);
@@ -39,10 +39,10 @@ export default function WalletPage() {
                 if (statusData.transaction?.status === "COMPLETED") {
                     window.clearInterval(poll);
                     setBalance((current) => current + Number(statusData.transaction.amount));
-                    setMessage("MTN payment received. Your wallet has been credited.");
+                    setMessage(`${provider === "AIRTEL" ? "Airtel Money" : "MTN MoMo"} payment received. Your wallet has been credited.`);
                 } else if (statusData.transaction?.status === "REJECTED") {
                     window.clearInterval(poll);
-                    setError("The MTN payment was not completed.");
+                    setError(`The ${provider === "AIRTEL" ? "Airtel Money" : "MTN MoMo"} payment was not completed.`);
                 }
             }, 4000);
             window.setTimeout(() => window.clearInterval(poll), 120000);
@@ -67,7 +67,8 @@ export default function WalletPage() {
                 <h2 className="font-bold">{action === "deposit" ? "Deposit by mobile money" : "Withdraw to mobile money"}</h2>
                 <label className="block text-sm">Amount (UGX)<input required min={500} max={1000000} type="number" value={amount} onChange={(event) => setAmount(event.target.value)} className="mt-2 w-full bg-navy-700 rounded-xl px-3 py-2" /></label>
                 <label className="block text-sm">Mobile number<input required value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value)} placeholder="+2567XXXXXXXX" className="mt-2 w-full bg-navy-700 rounded-xl px-3 py-2" /></label>
-                <label className="block text-sm">Network<select value={provider} disabled className="mt-2 w-full bg-navy-700 rounded-xl px-3 py-2"><option>MTN MoMo</option></select></label>
+                <label className="block text-sm">Mobile money network<select value={provider} onChange={(event) => setProvider(event.target.value)} className="mt-2 w-full bg-navy-700 rounded-xl px-3 py-2"><option value="MTN">MTN MoMo</option><option value="AIRTEL">Airtel Money</option></select></label>
+                {action === "deposit" && provider === "AIRTEL" && <p className="text-amber-200 text-sm">Airtel deposits will be available after KBet payment API setup.</p>}
                 {error && <p className="text-red-300 text-sm">{error}</p>}
                 {message && <p className="text-green-300 text-sm">{message}</p>}
                 <button type="submit" className="w-full bg-gold text-navy-950 font-bold py-3 rounded-xl">Submit request</button>

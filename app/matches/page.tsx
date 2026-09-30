@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-type Match = { id: string; stakeAmount: number; status: string; createdAt: string; creator: { id: string; username: string; teamName?: string }; acceptedBy?: { id: string; username: string; teamName?: string } | null; decision?: { winnerId?: string | null; creatorScore?: number | null; acceptedByScore?: number | null; reasoning?: string | null } | null };
+type Match = { id: string; game: "DLS" | "EFOOTBALL"; stakeAmount: number; status: string; createdAt: string; creator: { id: string; username: string; teamName?: string }; acceptedBy?: { id: string; username: string; teamName?: string } | null; decision?: { winnerId?: string | null; creatorScore?: number | null; acceptedByScore?: number | null; reasoning?: string | null } | null };
 
 export default function MatchesPage() {
     const [matches, setMatches] = useState<Match[]>([]);
@@ -70,7 +70,7 @@ export default function MatchesPage() {
                     const summary = hasScore ? `${creatorName} ${match.decision?.creatorScore} - ${acceptedByName} ${match.decision?.acceptedByScore}` : match.decision?.winnerId ? `Winner: ${match.decision.winnerId === match.creator.id ? creatorName : acceptedByName}` : "Result pending verification";
                     return <article key={match.id} className="bg-navy-800 border border-navy-700 rounded-2xl p-4 space-y-4">
                         <div className="flex items-start justify-between gap-3">
-                            <div><p className="font-bold">vs {opponent}</p><p className="text-xs text-slate-400 mt-1">{match.stakeAmount.toLocaleString()} UGX stake</p></div>
+                            <div><p className="font-bold">{match.game === "EFOOTBALL" ? "eFootball" : "DLS"} · vs {opponent}</p><p className="text-xs text-slate-400 mt-1">{match.stakeAmount.toLocaleString()} UGX stake</p></div>
                             <span className="text-xs uppercase tracking-wide text-gold">{status}</span>
                         </div>
                         <div className="bg-navy-700 rounded-xl px-3 py-3"><p className="text-xs text-slate-400">Result summary</p><p className="font-bold mt-1">{summary}</p></div>

@@ -33,7 +33,7 @@ export default function LobbyPage() {
           <h1 className="text-xl font-extrabold">
             Noble <span className="text-gold">Gamers</span>
           </h1>
-          <p className="text-xs text-slate-400">DLS Competitive</p>
+          <p className="text-xs text-slate-400">Football Challenges</p>
         </div>
         <Link
           href="/wallet"
@@ -72,7 +72,7 @@ export default function LobbyPage() {
                 </div>
                 <div>
                   <p className="font-semibold">{challenge.creator.username}</p>
-                  <p className="text-xs text-slate-400">Open now</p>
+                  <p className="text-xs text-slate-400">{challenge.game === "EFOOTBALL" ? "eFootball" : "DLS"} · Open now</p>
                 </div>
               </div>
               <div className="text-right">

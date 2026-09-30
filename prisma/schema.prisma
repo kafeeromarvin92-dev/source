@@ -1,3 +1,8 @@
+enum GameType {
+  DLS
+  EFOOTBALL
+}
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -57,6 +62,7 @@ model Session {
 
 model Challenge {
   id          String          @id @default(cuid())
+  game        GameType        @default(DLS)
   stakeAmount Int
   status      ChallengeStatus @default(OPEN)
   createdAt   DateTime        @default(now())

@@ -4,6 +4,7 @@ import Link from "next/link";
 
 export default function CreateChallengePage() {
     const [stake, setStake] = useState(1000);
+    const [game, setGame] = useState<"DLS" | "EFOOTBALL">("DLS");
     const [shareUrl, setShareUrl] = useState("");
     const [copied, setCopied] = useState(false);
 
@@ -20,6 +21,7 @@ export default function CreateChallengePage() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     stakeAmount: stake,
+                    game,
                 }),
             });
             const data = await response.json();
@@ -41,8 +43,8 @@ export default function CreateChallengePage() {
     async function shareInvite() {
         if (navigator.share) {
             await navigator.share({
-                title: "Noble Gamers challenge",
-                text: `Join my ${stake.toLocaleString()} UGX DLS challenge`,
+                title: `Noble Gamers ${game === "EFOOTBALL" ? "eFootball" : "DLS"} challenge`,
+                text: `Join my ${stake.toLocaleString()} UGX ${game === "EFOOTBALL" ? "eFootball" : "DLS"} challenge`,
                 url: shareUrl,
             });
         } else {
@@ -54,6 +56,17 @@ export default function CreateChallengePage() {
         <div className="px-4 pt-4 space-y-6">
             <Link href="/" className="text-gold text-sm"> Back</Link>
             <h1 className="text-2xl font-extrabold">Create Challenge</h1>
+            <div>
+                <p className="mb-2 text-sm text-slate-400">Choose game</p>
+                <div className="grid grid-cols-2 gap-2" role="group" aria-label="Game">
+                    {(["DLS", "EFOOTBALL"] as const).map((option) => (
+                        <button key={option} type="button" aria-pressed={game === option} onClick={() => setGame(option)} className={`py-3 rounded-xl font-bold ${game === option ? "bg-gold text-navy-950" : "bg-navy-800 border border-navy-700"}`}>
+                            {option === "DLS" ? "DLS" : "eFootball"}
+                        </button>
+                    ))}
+                </div>
+                {game === "EFOOTBALL" && <p className="text-xs text-slate-400 mt-2">eFootball review rules are pending; admins will review match screenshots for now.</p>}
+            </div>
             <div>
                 <p className="mb-2 text-sm text-slate-400">Stake Amount (UGX)</p>
                 <div className="grid grid-cols-3 gap-2">

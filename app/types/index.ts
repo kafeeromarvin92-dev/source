@@ -15,6 +15,7 @@ export interface User {
 
 export interface Challenge {
     id: string;
+    game: "DLS" | "EFOOTBALL";
     creator: User;
     stakeAmount: number;
     status: "open" | "accepted" | "cancelled";

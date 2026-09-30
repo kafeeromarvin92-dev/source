@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 type Result = {
     id: string;
+    game: "DLS" | "EFOOTBALL";
     createdAt: string;
     creator: { id: string; username: string; teamName: string; avatar: string };
     acceptedBy: { id: string; username: string; teamName: string; avatar: string } | null;
@@ -32,7 +33,7 @@ export default function ResultsPage() {
             const opponentName = result.acceptedBy?.teamName || result.acceptedBy?.username || "Opponent";
             const hasScore = Number.isInteger(result.decision.creatorScore) && Number.isInteger(result.decision.acceptedByScore);
             return <article key={result.id} className="bg-navy-800 border border-navy-700 rounded-2xl p-4">
-                <div className="flex items-center justify-between text-xs text-slate-400"><span>Verified match</span><span>{result.decision.confidence != null ? `${result.decision.confidence}% AI confidence` : "Admin verified"}</span></div>
+                <div className="flex items-center justify-between text-xs text-slate-400"><span>{result.game === "EFOOTBALL" ? "eFootball" : "DLS"} · Verified match</span><span>{result.decision.confidence != null ? `${result.decision.confidence}% AI recommendation` : "Admin verified"}</span></div>
                 <div className="text-center py-4"><p className="text-lg font-bold">{hasScore ? `${creatorName} ${result.decision.creatorScore} - ${opponentName} ${result.decision.acceptedByScore}` : `${creatorName} vs ${opponentName}`}</p><p className="text-sm text-green-300 mt-2">Winner: {creatorWon ? creatorName : opponentName}</p></div>
             </article>;
         })}</div>

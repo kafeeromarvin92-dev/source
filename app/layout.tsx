@@ -3,7 +3,7 @@ import BottomNav from "./components/BottomNav";
 
 export const metadata = {
   title: "Noble Gamers",
-  description: "Competitive DLS Platform",
+  description: "Competitive DLS and eFootball challenges",
 };
 
 export default function RootLayout({
