@@ -5,11 +5,23 @@ import { prisma } from "../../../../lib/prisma";
 import { runAiReview } from "../../../../lib/adjudication";
 
 type RouteContext = { params: Promise<{ id: string }> };
+const roomInclude = {
+    creator: { select: { id: true, username: true, teamName: true, avatar: true } },
+    acceptedBy: { select: { id: true, username: true, teamName: true, avatar: true } },
+    messages: { include: { sender: { select: { id: true, username: true } } }, orderBy: { createdAt: "asc" as const } },
+    codes: true,
+    submissions: { include: { player: { select: { id: true, username: true } } } },
+    decision: true,
+    objections: true,
+} satisfies Prisma.ChallengeInclude;
 
 export async function GET(_request: Request, context: RouteContext) {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Log in to view the match room." }, { status: 401 });
     const { id } = await context.params;
-    const room = await prisma.challenge.findUnique({ where: { id }, include: { creator: true, acceptedBy: true, messages: { include: { sender: true }, orderBy: { createdAt: "asc" } }, codes: true, submissions: { include: { player: true } }, decision: true, objections: true } });
+    const room = await prisma.challenge.findUnique({ where: { id }, include: roomInclude });
     if (!room || room.status === "OPEN") return NextResponse.json({ error: "Match room is not ready." }, { status: 404 });
+    if (room.creatorId !== user.id && room.acceptedById !== user.id) return NextResponse.json({ error: "You are not a player in this match." }, { status: 403 });
     return NextResponse.json({ room: formatRoom(room) });
 }
 
@@ -33,15 +45,26 @@ export async function POST(request: Request, context: RouteContext) {
         await prisma.challenge.update({ where: { id }, data: { status: "DISPUTED", decision: { update: { status: "DISPUTED" } } } });
     } else return NextResponse.json({ error: "Invalid match-room action." }, { status: 400 });
 
-    const updated = await prisma.challenge.findUnique({ where: { id }, include: { creator: true, acceptedBy: true, messages: { include: { sender: true }, orderBy: { createdAt: "asc" } }, codes: true, submissions: { include: { player: true } }, decision: true, objections: true } });
+    const updated = await prisma.challenge.findUnique({ where: { id }, include: roomInclude });
     return NextResponse.json({ room: updated ? formatRoom(updated) : null });
 }
 
-type MatchRoom = Prisma.ChallengeGetPayload<{ include: { creator: true; acceptedBy: true; messages: { include: { sender: true } }; codes: true; submissions: { include: { player: true } }; decision: true; objections: true } }>;
+type MatchRoom = Prisma.ChallengeGetPayload<{ include: typeof roomInclude }>;
 
 function formatRoom(room: MatchRoom) {
     return {
-        challenge: { ...room, status: room.status.toLowerCase(), isPrivate: true },
+        challenge: {
+            id: room.id,
+            game: room.game,
+            stakeAmount: room.stakeAmount,
+            status: room.status.toLowerCase(),
+            createdAt: room.createdAt,
+            creatorId: room.creatorId,
+            acceptedById: room.acceptedById,
+            creator: room.creator,
+            acceptedBy: room.acceptedBy,
+            isPrivate: true,
+        },
         messages: room.messages.map((message) => ({ id: message.id, senderId: message.senderId, senderName: message.sender.username, text: message.text, createdAt: message.createdAt })),
         playerCodes: Object.fromEntries(room.codes.map((code) => [code.playerId, code.code])),
         submissions: Object.fromEntries(room.submissions.map((submission) => [submission.playerId, { playerName: submission.player.username, image: submission.image, submittedAt: submission.createdAt }])) ,

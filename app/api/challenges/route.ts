@@ -3,7 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { getCurrentUser } from "../../lib/server-auth";
 import { prisma } from "../../lib/prisma";
 
-const userSelect = { id: true, username: true, teamName: true, email: true, avatar: true, walletBalance: true } as const;
+const userSelect = { id: true, username: true, teamName: true, avatar: true } as const;
 
 export async function GET(request: Request) {
     const user = await getCurrentUser();

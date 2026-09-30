@@ -4,10 +4,11 @@ import { getCurrentUser } from "../../../lib/server-auth";
 import { prisma } from "../../../lib/prisma";
 
 type RouteContext = { params: Promise<{ id: string }> };
+const userSelect = { id: true, username: true, teamName: true, avatar: true } as const;
 
 export async function GET(_request: Request, context: RouteContext) {
     const { id } = await context.params;
-    const challenge = await prisma.challenge.findUnique({ where: { id }, include: { creator: true, acceptedBy: true, decision: true } });
+    const challenge = await prisma.challenge.findUnique({ where: { id }, include: { creator: { select: userSelect }, acceptedBy: { select: userSelect }, decision: true } });
 
     if (!challenge) return NextResponse.json({ error: "Challenge not found." }, { status: 404 });
     return NextResponse.json({ challenge: { ...challenge, status: challenge.status.toLowerCase(), isPrivate: true } });
@@ -29,7 +30,7 @@ export async function PATCH(_request: Request, context: RouteContext) {
         if (!creator || !accepter || creator.walletBalance < challenge.stakeAmount || accepter.walletBalance < challenge.stakeAmount) throw new Error("INSUFFICIENT_STAKE");
         await transaction.user.update({ where: { id: creator.id }, data: { walletBalance: { decrement: challenge.stakeAmount } } });
         await transaction.user.update({ where: { id: accepter.id }, data: { walletBalance: { decrement: challenge.stakeAmount } } });
-        const updated = await transaction.challenge.update({ where: { id }, data: { status: "ACCEPTED", acceptedById: user.id }, include: { creator: true, acceptedBy: true } });
+        const updated = await transaction.challenge.update({ where: { id }, data: { status: "ACCEPTED", acceptedById: user.id }, include: { creator: { select: userSelect }, acceptedBy: { select: userSelect } } });
         await transaction.matchDecision.create({ data: { challengeId: id } });
         await transaction.ledgerEntry.createMany({ data: [
             { challengeId: id, userId: creator.id, amount: -challenge.stakeAmount, type: "STAKE_LOCK" },
