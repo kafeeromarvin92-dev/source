@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { clearStoredUser, getStoredUser, saveStoredUser } from "../lib/auth";
+import { clearStoredUser, saveStoredUser } from "../lib/auth";
 import { defaultUser } from "../lib/default-user";
 import { User } from "../types";
 
 export default function ProfilePage() {
-    const [user, setUser] = useState<User>(() => getStoredUser() ?? defaultUser);
+    const [user, setUser] = useState<User>(defaultUser);
     const [isEditing, setIsEditing] = useState(false);
-    const [username, setUsername] = useState(() => getStoredUser()?.username ?? defaultUser.username);
+    const [username, setUsername] = useState(defaultUser.username);
     const [signedOut, setSignedOut] = useState(false);
 
     useEffect(() => {
@@ -59,6 +59,7 @@ export default function ProfilePage() {
                         <h1 className="text-2xl font-extrabold">{user.username}</h1>
                         {user.teamName && <p className="text-gold mt-1">{user.teamName}</p>}
                         <p className="text-slate-400 mt-2">{user.email || "Sign in to view account details"}</p>
+                        {user.email && <p className="mt-1 text-xs text-green-300">{user.emailVerified ? "Verified Gmail" : "Email not verified"}</p>}
                     </>
                 )}
             </div>
@@ -71,7 +72,8 @@ export default function ProfilePage() {
 
             <section className="bg-navy-800 border border-navy-700 rounded-2xl divide-y divide-navy-700">
                 <button onClick={() => setIsEditing(!isEditing)} className="w-full flex justify-between px-4 py-4 text-left"><span>Account details</span><span className="text-gold">Edit</span></button>
-                <Link href="/wallet" className="flex justify-between px-4 py-4"><span>Wallet balance</span><span className="text-gold font-bold">{user.walletBalance.toLocaleString()} UGX</span></Link>
+                <Link href="/friends" className="flex justify-between px-4 py-4"><span>Friends &amp; requests</span><span className="text-gold">Manage</span></Link>
+                <Link href="/wallet" className="flex justify-between px-4 py-4"><span>Noble Coins</span><span className="text-gold font-bold">{user.nobleCoins.toLocaleString()}</span></Link>
                 <button onClick={signOut} className="w-full px-4 py-4 text-left text-red-300">Sign out</button>
             </section>
         </div>

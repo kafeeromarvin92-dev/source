@@ -5,21 +5,21 @@ import { prisma } from "../../../lib/prisma";
 export async function GET() {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ user: null }, { status: 401 });
-    const [matches, wins, earnings] = await Promise.all([
-        prisma.challenge.count({ where: { status: "SETTLED", OR: [{ creatorId: user.id }, { acceptedById: user.id }] } }),
-        prisma.matchDecision.count({ where: { status: { in: ["SETTLED", "ADMIN_DECIDED"] }, winnerId: user.id } }),
-        prisma.ledgerEntry.aggregate({ where: { userId: user.id, type: "WINNER_PAYOUT" }, _sum: { amount: true } }),
+    const [matches, wins] = await Promise.all([
+        prisma.challenge.count({ where: { status: "SETTLED", verified: true, OR: [{ creatorId: user.id }, { acceptedById: user.id }] } }),
+        prisma.challenge.count({ where: { status: "SETTLED", verified: true, decision: { is: { winnerId: user.id } } } }),
     ]);
     return NextResponse.json({ user: {
         id: user.id,
         username: user.username,
         teamName: user.teamName,
         email: user.email,
+        emailVerified: Boolean(user.emailVerifiedAt),
         avatar: user.avatar,
-        walletBalance: user.walletBalance,
+        isAdmin: user.isAdmin,
+        nobleCoins: user.nobleCoins,
         totalWins: wins,
         totalMatches: matches,
-        totalEarnings: earnings._sum.amount || 0,
         winRate: matches ? Number(((wins / matches) * 100).toFixed(1)) : 0,
     } });
 }

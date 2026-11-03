@@ -23,7 +23,7 @@ export default function ResultsPage() {
     }, []);
 
     return <div className="px-4 pt-4 space-y-5">
-        <div><h1 className="text-2xl font-extrabold">Public Results</h1><p className="text-slate-400 mt-2">Verified results from completed matches.</p></div>
+        <div><h1 className="text-2xl font-extrabold">Public Results</h1><p className="text-slate-400 mt-2">Gemini-verified results from completed matches.</p></div>
         {error && <p className="text-red-300 text-sm">{error}</p>}
         {!error && results.length === 0 && <p className="text-sm text-slate-400">No verified results yet.</p>}
         <div className="space-y-3">{results.map((result) => {

@@ -3,7 +3,7 @@ import { prisma } from "../../lib/prisma";
 
 export async function GET() {
     const results = await prisma.challenge.findMany({
-        where: { status: "SETTLED", decision: { isNot: null } },
+        where: { status: "SETTLED", verified: true, decision: { isNot: null } },
         include: {
             creator: { select: { id: true, username: true, teamName: true, avatar: true } },
             acceptedBy: { select: { id: true, username: true, teamName: true, avatar: true } },

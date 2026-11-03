@@ -1,76 +1,58 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 export default function RegisterPage() {
-    const router = useRouter();
     const [username, setUsername] = useState("");
-    const [email, setEmail] = useState("");
     const [teamName, setTeamName] = useState("");
-    const [password, setPassword] = useState("");
-    const [avatar, setAvatar] = useState("");
-    const [logoName, setLogoName] = useState("");
     const [error, setError] = useState("");
+    const [submitting, setSubmitting] = useState(false);
 
-    async function register(event: FormEvent<HTMLFormElement>) {
-        event.preventDefault();
-        if (password.length < 8) {
-            setError("Use at least 8 characters for your password.");
+    useEffect(() => {
+        const reason = new URLSearchParams(window.location.search).get("error");
+        const errors: Record<string, string> = {
+            profile: "Enter a username and team name before continuing.",
+            profile_required: "Your username or team name is missing. Please try again.",
+            gmail_required: "Please choose a verified @gmail.com account.",
+            google_account_conflict: "That Gmail is linked to a different Google identity. Contact support.",
+            google_unavailable: "Google sign-in is unavailable. Check the OAuth configuration and try again.",
+            google_verification: "Google could not verify the sign-in. Please try again.",
+        };
+        if (reason) window.setTimeout(() => setError(errors[reason] || "Google sign-in did not complete. Please try again."), 0);
+    }, []);
+
+    function continueWithGoogle() {
+        setError("");
+        if (username.trim().length < 3 || teamName.trim().length < 2) {
+            setError("Enter a username (at least 3 characters) and team name (at least 2 characters).");
             return;
         }
-
-        if (!avatar) {
-            setError("Upload a team logo screenshot before creating your account.");
-            return;
-        }
-
-        const response = await fetch("/api/auth/register", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username, teamName, email, password, avatar }),
-        });
-        const data = await response.json();
-        if (!response.ok) {
-            setError(data.error || "Could not create account.");
-            return;
-        }
-        router.push("/");
+        setSubmitting(true);
+        const query = new URLSearchParams({ mode: "register", username: username.trim(), teamName: teamName.trim() });
+        window.location.href = `/api/auth/google/start?${query.toString()}`;
     }
 
     return (
         <div className="px-4 pt-6 pb-8">
-            <Link href="/" className="text-gold text-sm">Back to lobby</Link>
-            <div className="mt-8 mb-7">
-                <p className="text-gold text-sm font-bold uppercase tracking-wider">New player</p>
-                <h1 className="text-3xl font-extrabold mt-2">Create your account</h1>
-                <p className="text-slate-400 mt-2">Build your record, challenge real players, and compete for the top spot.</p>
+            <Link href="/" className="text-gold text-sm">← Back to lobby</Link>
+            <div className="mt-8 mb-7 rounded-3xl border border-gold/20 bg-gradient-to-br from-gold/15 to-navy-900 p-6">
+                <p className="text-gold text-sm font-bold uppercase tracking-wider">Join the squad</p>
+                <h1 className="mt-2 text-3xl font-black">Make it official.</h1>
+                <p className="mt-2 text-slate-300">Use Google to verify a real Gmail account. Your email stays private and is only shared with accepted friends.</p>
             </div>
-            <form onSubmit={register} className="space-y-4">
-                <label className="block text-sm font-semibold">Username<input required minLength={3} value={username} onChange={(event) => setUsername(event.target.value)} placeholder="e.g. GoalHunter" className="mt-2 w-full bg-navy-800 border border-navy-700 rounded-xl px-4 py-3 text-white placeholder:text-slate-500" /></label>
-                <label className="block text-sm font-semibold">Email address<input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" className="mt-2 w-full bg-navy-800 border border-navy-700 rounded-xl px-4 py-3 text-white placeholder:text-slate-500" /></label>
-                <label className="block text-sm font-semibold">Team name<input required minLength={2} value={teamName} onChange={(event) => setTeamName(event.target.value)} placeholder="e.g. Kampala Kings" className="mt-2 w-full bg-navy-800 border border-navy-700 rounded-xl px-4 py-3 text-white placeholder:text-slate-500" /></label>
-                <label className="block text-sm font-semibold">Password<input required type="password" minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="At least 8 characters" className="mt-2 w-full bg-navy-800 border border-navy-700 rounded-xl px-4 py-3 text-white placeholder:text-slate-500" /></label>
-                <div>
-                    <p className="text-sm font-semibold mb-2">Team logo screenshot</p>
-                    <label className="block bg-navy-800 border border-dashed border-navy-600 rounded-xl p-4 cursor-pointer">
-                        <span className="text-sm text-slate-300">{logoName || "Upload your team logo image"}</span>
-                        <input required type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(event) => {
-                            const file = event.target.files?.[0];
-                            if (!file) return;
-                            setLogoName(file.name);
-                            const reader = new FileReader();
-                            reader.onload = () => setAvatar(String(reader.result));
-                            reader.readAsDataURL(file);
-                        }} />
-                    </label>
-                    {avatar && <img src={avatar} alt="Team logo preview" className="mt-3 w-20 h-20 rounded-xl object-cover border border-gold/40" />}
-                </div>
-                {error && <p className="text-red-300 text-sm">{error}</p>}
-                <button type="submit" className="w-full bg-gold text-navy-950 font-bold py-3 rounded-xl text-lg">Create account</button>
+            <form onSubmit={(event) => { event.preventDefault(); continueWithGoogle(); }} className="space-y-4">
+                <label className="block text-sm font-semibold">Username
+                    <input required minLength={3} value={username} onChange={(event) => setUsername(event.target.value)} placeholder="e.g. GoalHunter" className="mt-2 w-full rounded-xl border border-navy-700 bg-navy-800 px-4 py-3 text-white placeholder:text-slate-500" />
+                </label>
+                <label className="block text-sm font-semibold">Team name
+                    <input required minLength={2} value={teamName} onChange={(event) => setTeamName(event.target.value)} placeholder="e.g. Kampala Kings" className="mt-2 w-full rounded-xl border border-navy-700 bg-navy-800 px-4 py-3 text-white placeholder:text-slate-500" />
+                </label>
+                {error && <p className="text-sm text-red-300">{error}</p>}
+                <button type="submit" disabled={submitting} className="w-full rounded-xl bg-white py-3 text-lg font-bold text-slate-900 transition hover:bg-slate-100 disabled:opacity-60">{submitting ? "Opening Google..." : "Continue with Google"}</button>
+                <p className="text-center text-xs text-slate-400">Only verified @gmail.com addresses can create an account.</p>
             </form>
-            <p className="text-center text-sm text-slate-400 mt-6">Already have an account? <Link href="/login" className="text-gold font-semibold">Log in</Link></p>
+            <p className="mt-6 text-center text-sm text-slate-400">Already in the squad? <Link href="/login" className="font-semibold text-gold">Log in</Link></p>
         </div>
     );
 }

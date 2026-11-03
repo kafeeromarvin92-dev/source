@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import FlexWinButton from "../components/FlexWinButton";
 
-type Match = { id: string; stakeAmount: number; status: string; createdAt: string; creator: { id: string; username: string; teamName?: string }; acceptedBy?: { id: string; username: string; teamName?: string } | null; decision?: { winnerId?: string | null; creatorScore?: number | null; acceptedByScore?: number | null; reasoning?: string | null } | null };
+type Match = { id: string; stakeAmount: number; entryFeeCoins: number; status: string; verified: boolean; createdAt: string; creator: { id: string; username: string; teamName?: string }; acceptedBy?: { id: string; username: string; teamName?: string } | null; decision?: { winnerId?: string | null; creatorScore?: number | null; acceptedByScore?: number | null; reasoning?: string | null } | null };
 
 export default function MatchesPage() {
     const [matches, setMatches] = useState<Match[]>([]);
@@ -27,7 +28,14 @@ export default function MatchesPage() {
             const data = await response.json();
             setCurrentUserId(data.user.id);
         });
-        void loadMatches();
+        void fetch("/api/challenges?mine=true").then(async (response) => {
+            const data = await response.json();
+            if (!response.ok) {
+                setError(data.error || "Could not load your matches.");
+                return;
+            }
+            setMatches(data.challenges);
+        });
     }, []);
 
     async function submitEvidence(matchId: string, event: React.ChangeEvent<HTMLInputElement>) {
@@ -47,6 +55,16 @@ export default function MatchesPage() {
         reader.readAsDataURL(file);
     }
 
+    async function cancelChallenge(matchId: string) {
+        const response = await fetch(`/api/challenges/${matchId}`, { method: "DELETE" });
+        const data = await response.json();
+        if (!response.ok) {
+            setError(data.error || "Could not cancel this challenge.");
+            return;
+        }
+        await loadMatches();
+    }
+
     return (
         <div className="px-4 pt-4 space-y-5">
             <h1 className="text-2xl font-extrabold">My Matches</h1>
@@ -63,11 +81,17 @@ export default function MatchesPage() {
                     const summary = hasScore ? `${creatorName} ${match.decision?.creatorScore} - ${acceptedByName} ${match.decision?.acceptedByScore}` : match.decision?.winnerId ? `Winner: ${match.decision.winnerId === match.creator.id ? creatorName : acceptedByName}` : "Result pending verification";
                     return <article key={match.id} className="bg-navy-800 border border-navy-700 rounded-2xl p-4 space-y-4">
                         <div className="flex items-start justify-between gap-3">
-                            <div><p className="font-bold">vs {opponent}</p><p className="text-xs text-slate-400 mt-1">{match.stakeAmount.toLocaleString()} UGX stake</p></div>
+                            <div><p className="font-bold">vs {opponent}</p><p className="text-xs text-slate-400 mt-1">100 Noble Coin entry fee</p></div>
                             <span className="text-xs uppercase tracking-wide text-gold">{status}</span>
                         </div>
                         <div className="bg-navy-700 rounded-xl px-3 py-3"><p className="text-xs text-slate-400">Result summary</p><p className="font-bold mt-1">{summary}</p></div>
+                        {match.verified && match.decision?.winnerId === currentUserId && match.acceptedBy && match.decision.creatorScore != null && match.decision.acceptedByScore != null && <FlexWinButton
+                            opponentName={match.creator.id === currentUserId ? match.acceptedBy.username : match.creator.username}
+                            winnerScore={match.creator.id === currentUserId ? match.decision.creatorScore : match.decision.acceptedByScore}
+                            opponentScore={match.creator.id === currentUserId ? match.decision.acceptedByScore : match.decision.creatorScore}
+                        />}
                         {status !== "OPEN" && status !== "SETTLED" && status !== "CANCELLED" && <label className="block text-center bg-gold text-navy-950 font-bold py-3 rounded-xl cursor-pointer">{uploading === match.id ? "Uploading..." : "Submit result screenshot"}<input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(event) => { void submitEvidence(match.id, event); }} /></label>}
+                        {status === "OPEN" && match.creator.id === currentUserId && <button onClick={() => { void cancelChallenge(match.id); }} className="w-full border border-red-400/40 text-red-200 font-semibold py-2 rounded-xl">{match.entryFeeCoins > 0 ? "Cancel and refund 100 coins" : "Cancel challenge"}</button>}
                         <Link href={`/match/${match.id}`} className="block text-center border border-navy-600 text-slate-200 font-semibold py-2 rounded-xl">Open private challenge</Link>
                     </article>;
                 })}

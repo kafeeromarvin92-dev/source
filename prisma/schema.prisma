@@ -23,6 +23,11 @@ enum DecisionStatus {
   SETTLED
 }
 
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+}
+
 model User {
   id            String        @id @default(cuid())
   username      String
@@ -31,6 +36,9 @@ model User {
   passwordHash  String
   avatar        String
   walletBalance Int           @default(0)
+  nobleCoins    Int           @default(1000)
+  googleId      String?       @unique
+  emailVerifiedAt DateTime?
   isAdmin       Boolean       @default(false)
   createdAt     DateTime      @default(now())
   sessions      Session[]
@@ -44,6 +52,22 @@ model User {
   wonDecisions  MatchDecision[] @relation("winnerDecisions")
   ledgerEntries LedgerEntry[]
   walletTransactions WalletTransaction[]
+  sentFriendRequests FriendRequest[] @relation("sentFriendRequests")
+  receivedFriendRequests FriendRequest[] @relation("receivedFriendRequests")
+}
+
+model FriendRequest {
+  id          String           @id @default(cuid())
+  requesterId String
+  recipientId String
+  status      FriendshipStatus @default(PENDING)
+  createdAt   DateTime         @default(now())
+  requester   User             @relation("sentFriendRequests", fields: [requesterId], references: [id], onDelete: Cascade)
+  recipient   User             @relation("receivedFriendRequests", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@unique([requesterId, recipientId])
+  @@index([recipientId, status])
+  @@index([requesterId, status])
 }
 
 model Session {
@@ -58,6 +82,8 @@ model Session {
 model Challenge {
   id          String          @id @default(cuid())
   stakeAmount Int
+  entryFeeCoins Int            @default(0)
+  verified    Boolean         @default(false)
   status      ChallengeStatus @default(OPEN)
   createdAt   DateTime        @default(now())
   creatorId   String

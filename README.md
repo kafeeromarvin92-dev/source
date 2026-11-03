@@ -16,6 +16,10 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Google sign-in
+
+Copy the Google OAuth variables from `.env.example` into `.env` and set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_REDIRECT_URI`. In Google Cloud Console, create a Web application OAuth client and add the exact redirect URI configured in `GOOGLE_REDIRECT_URI` (for local development, `http://localhost:3000/api/auth/google/callback`). Google sign-in and account creation require a verified `@gmail.com` address.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
