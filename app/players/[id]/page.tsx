@@ -34,10 +34,10 @@ export default function PlayerProfilePage() {
             {error && <div className="rounded-2xl border border-gold/20 bg-navy-800 p-5"><p className="font-bold">This profile is private</p><p className="mt-2 text-sm text-slate-400">{error}</p></div>}
             {profile && <>
                 <header className="rounded-3xl border border-gold/20 bg-gradient-to-br from-gold/15 to-navy-900 p-6 text-center">
-                    {profile.avatar.startsWith("data:image/") ? <img src={profile.avatar} alt={`${profile.teamName || profile.username} logo`} className="mx-auto h-20 w-20 rounded-2xl object-cover" /> : <div className="text-6xl">{profile.avatar || "⚽"}</div>}
+                    {profile.avatar.startsWith("/api/media/") ? <img src={profile.avatar} alt={`${profile.teamName || profile.username} logo`} className="mx-auto h-20 w-20 rounded-2xl object-cover" /> : <div className="text-6xl">{profile.avatar || "⚽"}</div>}
                     <h1 className="mt-3 text-2xl font-black">{profile.username}</h1>
                     <p className="text-sm text-gold">{profile.teamName}</p>
-                    {profile.email && <p className="mt-2 text-xs text-slate-400">{profile.email} · verified Gmail</p>}
+                    {profile.email && <p className="mt-2 text-xs text-slate-400">{profile.email}</p>}
                 </header>
                 <div className="grid grid-cols-3 gap-2 text-center">
                     <div className="rounded-xl bg-navy-800 p-4"><p className="text-2xl font-black">{profile.totalWins}</p><p className="text-xs text-slate-400">Verified wins</p></div>

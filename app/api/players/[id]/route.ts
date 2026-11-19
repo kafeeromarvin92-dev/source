@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "../../../lib/server-auth";
 import { prisma } from "../../../lib/prisma";
+import { avatarUrl } from "../../../lib/object-storage";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -22,7 +23,7 @@ export async function GET(_request: Request, context: RouteContext) {
 
     const player = await prisma.user.findUnique({
         where: { id },
-        select: { id: true, username: true, teamName: true, avatar: true, email: true, emailVerifiedAt: true },
+        select: { id: true, username: true, teamName: true, avatar: true, email: true, bio: true, gameTags: true, country: true },
     });
     if (!player) return NextResponse.json({ error: "Player not found." }, { status: 404 });
 
@@ -40,8 +41,11 @@ export async function GET(_request: Request, context: RouteContext) {
             id: player.id,
             username: player.username,
             teamName: player.teamName,
-            avatar: player.avatar,
-            email: (isSelf || friendship) && player.emailVerifiedAt ? player.email : null,
+            avatar: avatarUrl(player.id, player.avatar),
+            email: isSelf || friendship ? player.email : null,
+            bio: player.bio,
+            gameTags: player.gameTags,
+            country: player.country,
             totalWins: wins,
             totalMatches: matches,
             winRate: matches ? Number(((wins / matches) * 100).toFixed(1)) : 0,

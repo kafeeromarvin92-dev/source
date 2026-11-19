@@ -3,11 +3,12 @@ export interface User {
     username: string;
     teamName?: string;
     email?: string;
-    emailVerified?: boolean;
     avatar: string;
     isAdmin?: boolean;
     createdAt?: string;
-    nobleCoins: number;
+    bio?: string | null;
+    gameTags?: string;
+    country?: "Uganda" | "Kenya" | "Other" | null;
     totalWins: number;
     totalMatches: number;
     winRate: number;
@@ -16,8 +17,6 @@ export interface User {
 export interface Challenge {
     id: string;
     creator: User;
-    stakeAmount: number;
-    entryFeeCoins?: number;
     verified?: boolean;
     decision?: {
         winnerId?: string | null;

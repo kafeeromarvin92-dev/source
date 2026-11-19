@@ -1,81 +1,31 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { clearStoredUser, saveStoredUser } from "../lib/auth";
 import { defaultUser } from "../lib/default-user";
 import { User } from "../types";
 
 export default function ProfilePage() {
+    const router = useRouter();
     const [user, setUser] = useState<User>(defaultUser);
-    const [isEditing, setIsEditing] = useState(false);
-    const [username, setUsername] = useState(defaultUser.username);
-    const [signedOut, setSignedOut] = useState(false);
+    const [editing, setEditing] = useState(false);
+    const [bio, setBio] = useState("");
+    const [gameTags, setGameTags] = useState("DLS");
+    const [country, setCountry] = useState("");
+    const [message, setMessage] = useState("");
 
-    useEffect(() => {
-        fetch("/api/auth/me").then(async (response) => {
-            if (!response.ok) return;
-            const data = await response.json();
-            setUser((current) => ({ ...current, ...data.user }));
-            setUsername(data.user.username);
-        });
-    }, []);
+    useEffect(() => { void fetch("/api/auth/me").then(async (response) => { if (!response.ok) return; const data = await response.json(); setUser((current) => ({ ...current, ...data.user })); setBio(data.user.bio || ""); setGameTags(data.user.gameTags || "DLS"); setCountry(data.user.country || ""); }); }, []);
+    async function save() { const response = await fetch("/api/profile", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ bio, gameTags, country }) }); const data = await response.json(); if (!response.ok) { setMessage(data.error || "Could not save profile."); return; } const updated = { ...user, ...data.user }; setUser(updated); saveStoredUser(updated); setEditing(false); setMessage("Profile saved."); }
+    async function signOut() { await fetch("/api/auth/logout", { method: "POST" }); clearStoredUser(); router.push("/login"); }
 
-    function saveProfile() {
-        const updatedUser = { ...user, username: username.trim() || user.username };
-        setUser(updatedUser);
-        saveStoredUser(updatedUser);
-        setIsEditing(false);
-    }
-
-    async function signOut() {
-        await fetch("/api/auth/logout", { method: "POST" });
-        clearStoredUser();
-        setSignedOut(true);
-    }
-
-    if (signedOut) {
-        return (
-            <div className="px-4 pt-10 text-center space-y-4">
-                <div className="text-5xl">👋</div>
-                <h1 className="text-2xl font-extrabold">See you in the lobby</h1>
-                <p className="text-slate-400">Your account is signed out on this device.</p>
-                <Link href="/register" className="inline-block bg-gold text-navy-950 font-bold px-5 py-3 rounded-xl">Create an account</Link>
-            </div>
-        );
-    }
-
-    return (
-        <div className="px-4 pt-4 space-y-5">
-            <div className="text-center">
-                <div className="flex justify-center mb-4">{user.avatar?.startsWith("data:image/") ? <img src={user.avatar} alt={`${user.teamName || user.username} logo`} className="w-24 h-24 rounded-2xl object-cover border border-gold/40" /> : <div className="text-6xl">{user.avatar}</div>}</div>
-                {isEditing ? (
-                    <div className="flex gap-2 max-w-xs mx-auto">
-                        <input value={username} onChange={(event) => setUsername(event.target.value)} className="min-w-0 flex-1 bg-navy-800 border border-navy-700 rounded-xl px-3 py-2 text-white" aria-label="Username" />
-                        <button onClick={saveProfile} className="bg-gold text-navy-950 font-bold px-3 rounded-xl">Save</button>
-                    </div>
-                ) : (
-                    <>
-                        <h1 className="text-2xl font-extrabold">{user.username}</h1>
-                        {user.teamName && <p className="text-gold mt-1">{user.teamName}</p>}
-                        <p className="text-slate-400 mt-2">{user.email || "Sign in to view account details"}</p>
-                        {user.email && <p className="mt-1 text-xs text-green-300">{user.emailVerified ? "Verified Gmail" : "Email not verified"}</p>}
-                    </>
-                )}
-            </div>
-
-            <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="bg-navy-800 rounded-xl p-3"><p className="text-xl font-bold">{user.totalWins}</p><p className="text-xs text-slate-400">Wins</p></div>
-                <div className="bg-navy-800 rounded-xl p-3"><p className="text-xl font-bold">{user.totalMatches}</p><p className="text-xs text-slate-400">Matches</p></div>
-                <div className="bg-navy-800 rounded-xl p-3"><p className="text-xl font-bold">{user.winRate}%</p><p className="text-xs text-slate-400">Win rate</p></div>
-            </div>
-
-            <section className="bg-navy-800 border border-navy-700 rounded-2xl divide-y divide-navy-700">
-                <button onClick={() => setIsEditing(!isEditing)} className="w-full flex justify-between px-4 py-4 text-left"><span>Account details</span><span className="text-gold">Edit</span></button>
-                <Link href="/friends" className="flex justify-between px-4 py-4"><span>Friends &amp; requests</span><span className="text-gold">Manage</span></Link>
-                <Link href="/wallet" className="flex justify-between px-4 py-4"><span>Noble Coins</span><span className="text-gold font-bold">{user.nobleCoins.toLocaleString()}</span></Link>
-                <button onClick={signOut} className="w-full px-4 py-4 text-left text-red-300">Sign out</button>
-            </section>
-        </div>
-    );
+    return <div className="space-y-5 px-4 pt-5">
+        <header className="text-center">{user.avatar?.startsWith("/api/media/") ? <img src={user.avatar} alt="Team logo" className="mx-auto h-20 w-20 rounded-2xl object-cover" /> : <div className="text-6xl">{user.avatar || "⚽"}</div>}<h1 className="mt-2 text-2xl font-black">{user.username}</h1><p className="text-gold">{user.teamName}</p><p className="mt-1 text-sm text-slate-400">{user.country || "Country not set"}</p></header>
+        <div className="grid grid-cols-3 gap-2 text-center"><div className="rounded-xl bg-navy-800 p-3"><p className="text-xl font-bold">{user.totalWins}</p><p className="text-xs text-slate-400">Verified wins</p></div><div className="rounded-xl bg-navy-800 p-3"><p className="text-xl font-bold">{user.totalMatches}</p><p className="text-xs text-slate-400">Matches</p></div><div className="rounded-xl bg-navy-800 p-3"><p className="text-xl font-bold">{user.winRate}%</p><p className="text-xs text-slate-400">Win rate</p></div></div>
+        <section className="rounded-2xl border border-navy-700 bg-navy-800 p-4"><p className="text-sm font-bold">Player card</p><p className="mt-2 text-sm text-slate-300">{user.bio || "Add a short bio so opponents know who they are playing."}</p><p className="mt-2 text-xs text-gold">Game tags: {user.gameTags || "DLS"}</p></section>
+        {editing && <section className="space-y-3 rounded-2xl border border-gold/30 bg-gold/5 p-4"><label className="block text-sm font-semibold">Bio <span className="text-slate-500">({bio.length}/160)</span><textarea maxLength={160} value={bio} onChange={(event) => setBio(event.target.value)} className="mt-2 min-h-20 w-full rounded-xl bg-navy-800 px-3 py-3" /></label><label className="block text-sm font-semibold">Game tags<input value={gameTags} onChange={(event) => setGameTags(event.target.value)} placeholder="DLS" className="mt-2 w-full rounded-xl bg-navy-800 px-3 py-3" /><span className="mt-1 block text-xs text-slate-500">DLS is currently the supported game.</span></label><label className="block text-sm font-semibold">Country<select value={country} onChange={(event) => setCountry(event.target.value)} className="mt-2 w-full rounded-xl bg-navy-800 px-3 py-3"><option value="">Prefer not to say</option><option>Uganda</option><option>Kenya</option><option>Other</option></select></label><button onClick={() => { void save(); }} className="w-full rounded-xl bg-gold py-3 font-bold text-navy-950">Save profile</button></section>}
+        {message && <p className="rounded-xl bg-navy-800 p-3 text-sm text-green-300">{message}</p>}
+        <section className="divide-y divide-navy-700 rounded-2xl border border-navy-700 bg-navy-800"><button onClick={() => setEditing((value) => !value)} className="w-full px-4 py-4 text-left">Edit player details <span className="float-right text-gold">{editing ? "Close" : "Edit"}</span></button><Link href="/friends" className="block px-4 py-4">Friends &amp; requests <span className="float-right text-gold">View</span></Link><Link href="/results" className="block px-4 py-4">Results <span className="float-right text-gold">View</span></Link><Link href="/notifications" className="block px-4 py-4">Alerts <span className="float-right text-gold">View</span></Link><Link href="/history" className="block px-4 py-4">Match history <span className="float-right text-gold">View</span></Link>{user.isAdmin && <Link href="/admin" className="block bg-gold/10 px-4 py-4 font-bold text-gold">Admin control room <span className="float-right">Open →</span></Link>}<button onClick={() => { void signOut(); }} className="w-full px-4 py-4 text-left text-red-300">Sign out</button></section>
+    </div>;
 }

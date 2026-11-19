@@ -6,20 +6,28 @@
     "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "admin:bootstrap": "node scripts/bootstrap-admin.mjs",
+    "media:migrate": "node scripts/migrate-inline-media.mjs",
+    "db:import-sqlite": "node scripts/migrate-sqlite-to-neon.mjs"
   },
   "dependencies": {
+    "@neon/config": "^1.14.0",
+    "@neon/env": "^2.1.3",
     "@prisma/adapter-better-sqlite3": "^7.10.0",
+    "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
+    "@vercel/functions": "^3.11.3",
     "bcryptjs": "^3.0.3",
-    "jose": "^6.2.12",
     "next": "16.3.5",
+    "pg": "^8.23.1",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

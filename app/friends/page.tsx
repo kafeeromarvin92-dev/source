@@ -70,7 +70,7 @@ export default function FriendsPage() {
             <header>
                 <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-gold">Your squad</p>
                 <h1 className="mt-1 text-3xl font-black">Friends</h1>
-                <p className="mt-2 text-sm text-slate-400">Accepted friends can see your private player stats. Your verified Gmail is only shared with friends.</p>
+                <p className="mt-2 text-sm text-slate-400">Accepted friends can see your private player stats and account email.</p>
             </header>
 
             <form onSubmit={addFriend} className="space-y-3 rounded-2xl border border-navy-700 bg-navy-800 p-4">

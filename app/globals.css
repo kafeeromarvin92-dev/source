@@ -29,3 +29,16 @@ button,
 a {
   -webkit-tap-highlight-color: transparent;
 }
+
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0) rotate(10deg); }
+  50% { transform: translateY(-10px) rotate(14deg); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(245 166 35 / 0.18); }
+  50% { box-shadow: 0 0 0 10px rgb(245 166 35 / 0); }
+}
+
+.float-slow { animation: float-slow 5s ease-in-out infinite; }
+.pulse-glow { animation: pulse-glow 2.4s ease-out infinite; }

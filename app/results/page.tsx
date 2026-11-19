@@ -23,7 +23,7 @@ export default function ResultsPage() {
     }, []);
 
     return <div className="px-4 pt-4 space-y-5">
-        <div><h1 className="text-2xl font-extrabold">Public Results</h1><p className="text-slate-400 mt-2">Gemini-verified results from completed matches.</p></div>
+        <div><h1 className="text-2xl font-extrabold">Public Results</h1><p className="text-slate-400 mt-2">Admin-verified results from completed matches.</p></div>
         {error && <p className="text-red-300 text-sm">{error}</p>}
         {!error && results.length === 0 && <p className="text-sm text-slate-400">No verified results yet.</p>}
         <div className="space-y-3">{results.map((result) => {
@@ -32,7 +32,7 @@ export default function ResultsPage() {
             const opponentName = result.acceptedBy?.teamName || result.acceptedBy?.username || "Opponent";
             const hasScore = Number.isInteger(result.decision.creatorScore) && Number.isInteger(result.decision.acceptedByScore);
             return <article key={result.id} className="bg-navy-800 border border-navy-700 rounded-2xl p-4">
-                <div className="flex items-center justify-between text-xs text-slate-400"><span>Verified match</span><span>{result.decision.confidence != null ? `${result.decision.confidence}% AI confidence` : "Admin verified"}</span></div>
+                <div className="flex items-center justify-between text-xs text-slate-400"><span>Verified match</span><span>Admin verified</span></div>
                 <div className="text-center py-4"><p className="text-lg font-bold">{hasScore ? `${creatorName} ${result.decision.creatorScore} - ${opponentName} ${result.decision.acceptedByScore}` : `${creatorName} vs ${opponentName}`}</p><p className="text-sm text-green-300 mt-2">Winner: {creatorWon ? creatorName : opponentName}</p></div>
             </article>;
         })}</div>

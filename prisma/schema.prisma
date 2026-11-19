@@ -1,9 +1,8 @@
 generator client {
   provider = "prisma-client-js"
 }
-
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 enum ChallengeStatus {
@@ -30,17 +29,17 @@ enum FriendshipStatus {
 
 model User {
   id            String        @id @default(cuid())
-  username      String
+  username      String        @unique
   teamName      String
   email         String        @unique
   passwordHash  String
   avatar        String
-  walletBalance Int           @default(0)
-  nobleCoins    Int           @default(1000)
-  googleId      String?       @unique
-  emailVerifiedAt DateTime?
   isAdmin       Boolean       @default(false)
+  bio           String?
+  gameTags      String        @default("DLS")
+  country       String?
   createdAt     DateTime      @default(now())
+  lastSeenAt    DateTime?
   sessions      Session[]
   created       Challenge[]   @relation("createdChallenges")
   accepted      Challenge[]   @relation("acceptedChallenges")
@@ -50,10 +49,20 @@ model User {
   objections    Objection[]
   decisions     MatchDecision[] @relation("adminDecisions")
   wonDecisions  MatchDecision[] @relation("winnerDecisions")
-  ledgerEntries LedgerEntry[]
-  walletTransactions WalletTransaction[]
+  notifications Notification[]
   sentFriendRequests FriendRequest[] @relation("sentFriendRequests")
   receivedFriendRequests FriendRequest[] @relation("receivedFriendRequests")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String?
+  title     String
+  message   String
+  kind      String   @default("INFO")
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model FriendRequest {
@@ -81,8 +90,6 @@ model Session {
 
 model Challenge {
   id          String          @id @default(cuid())
-  stakeAmount Int
-  entryFeeCoins Int            @default(0)
   verified    Boolean         @default(false)
   status      ChallengeStatus @default(OPEN)
   createdAt   DateTime        @default(now())
@@ -95,7 +102,6 @@ model Challenge {
   submissions Submission[]
   decision    MatchDecision?
   objections  Objection[]
-  ledger      LedgerEntry[]
 }
 
 model MatchMessage {
@@ -135,6 +141,9 @@ model MatchDecision {
   challengeId    String         @unique
   status         DecisionStatus @default(PENDING)
   winnerId       String?
+  proposedWinnerId String?
+  confirmedById  String?
+  confirmedAt    DateTime?
   confidence     Int?
   reasoning      String?
   creatorScore   Int?
@@ -145,7 +154,6 @@ model MatchDecision {
   winner         User?          @relation("winnerDecisions", fields: [winnerId], references: [id])
   decidedBy      User?          @relation("adminDecisions", fields: [decidedById], references: [id])
 }
-
 model Objection {
   id          String    @id @default(cuid())
   challengeId String
@@ -154,29 +162,4 @@ model Objection {
   createdAt   DateTime  @default(now())
   challenge   Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
   player      User      @relation(fields: [playerId], references: [id])
-}
-
-model LedgerEntry {
-  id          String    @id @default(cuid())
-  challengeId String
-  userId      String?
-  amount      Int
-  type        String
-  createdAt   DateTime  @default(now())
-  challenge   Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
-  user        User?     @relation(fields: [userId], references: [id])
-}
-
-model WalletTransaction {
-  id          String   @id @default(cuid())
-  userId      String
-  type        String
-  status      String   @default("PENDING")
-  amount      Int
-  phoneNumber String
-  provider    String
-  providerRef String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

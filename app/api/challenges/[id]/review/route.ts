@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { runAiReview, settleChallenge } from "../../../../lib/adjudication";
-import { getCurrentUser } from "../../../../lib/server-auth";
+import { settleChallenge } from "../../../../lib/adjudication";
+import { canAdmin, getCurrentUser } from "../../../../lib/server-auth";
 import { prisma } from "../../../../lib/prisma";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -39,18 +39,9 @@ export async function GET(_request: Request, context: RouteContext) {
 export async function POST(request: Request, context: RouteContext) {
     const { id } = await context.params;
     const body = await request.json().catch(() => null) as { action?: string; winnerId?: string } | null;
-    if (body?.action === "analyze") {
-        const user = await getCurrentUser();
-        const challenge = await prisma.challenge.findUnique({ where: { id }, select: { creatorId: true, acceptedById: true } });
-        if (!user || !challenge || (challenge.creatorId !== user.id && challenge.acceptedById !== user.id)) {
-            return NextResponse.json({ error: "Only players in this match can request a review." }, { status: 403 });
-        }
-        const result = await runAiReview(id);
-        return NextResponse.json({ result, message: result ? "AI review completed." : "Two readable submissions and AI configuration are required." });
-    }
     if (body?.action === "admin-decide") {
         const admin = await getCurrentUser();
-        if (!admin?.isAdmin || !body.winnerId) return NextResponse.json({ error: "Admin session and winner are required." }, { status: 403 });
+        if (!admin || !canAdmin(admin) || !body.winnerId) return NextResponse.json({ error: "Admin session and winner are required." }, { status: 403 });
         const result = await settleChallenge(id, body.winnerId, admin.id);
         if (!result) return NextResponse.json({ error: "Could not settle this match." }, { status: 409 });
         return NextResponse.json({ result });

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../lib/prisma";
+import { avatarUrl } from "../../lib/object-storage";
 
 export async function GET() {
     const results = await prisma.challenge.findMany({
@@ -12,5 +13,5 @@ export async function GET() {
         orderBy: { createdAt: "desc" },
         take: 50,
     });
-    return NextResponse.json({ results });
+    return NextResponse.json({ results: results.map((result) => ({ ...result, creator: result.creator ? { ...result.creator, avatar: avatarUrl(result.creator.id, result.creator.avatar) } : null, acceptedBy: result.acceptedBy ? { ...result.acceptedBy, avatar: avatarUrl(result.acceptedBy.id, result.acceptedBy.avatar) } : null })) });
 }

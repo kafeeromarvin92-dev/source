@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "../../lib/server-auth";
 import { prisma } from "../../lib/prisma";
+import { avatarUrl } from "../../lib/object-storage";
 
-const userSelect = { id: true, username: true, teamName: true, avatar: true, email: true, emailVerifiedAt: true } as const;
+const userSelect = { id: true, username: true, teamName: true, avatar: true, email: true } as const;
 function publicUser(user: { id: string; username: string; teamName: string; avatar: string }) {
-    return { id: user.id, username: user.username, teamName: user.teamName, avatar: user.avatar };
+    return { id: user.id, username: user.username, teamName: user.teamName, avatar: avatarUrl(user.id, user.avatar) };
 }
 
 export async function GET() {
@@ -34,7 +35,7 @@ export async function GET() {
                     username: friend.username,
                     teamName: friend.teamName,
                     avatar: friend.avatar,
-                    email: friend.emailVerifiedAt ? friend.email : null,
+                    email: friend.email,
                 },
             };
         });
@@ -51,10 +52,8 @@ export async function GET() {
 export async function POST(request: Request) {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Log in to add a friend." }, { status: 401 });
-    if (!user.emailVerifiedAt) return NextResponse.json({ error: "Verify your Gmail with Google before adding friends." }, { status: 403 });
-
     const body = await request.json().catch(() => null) as { username?: unknown } | null;
-    const username = typeof body?.username === "string" ? body.username.trim() : "";
+    const username = typeof body?.username === "string" ? body.username.trim().toLowerCase() : "";
     if (username.length < 3) return NextResponse.json({ error: "Enter a username with at least 3 characters." }, { status: 400 });
 
     const matches = await prisma.user.findMany({ where: { username }, select: { id: true }, take: 2 });

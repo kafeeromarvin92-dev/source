@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import type { Prisma } from "@prisma/client";
 import { getCurrentUser } from "../../lib/server-auth";
 import { prisma } from "../../lib/prisma";
-import { CHALLENGE_ENTRY_FEE } from "../../lib/economy";
+import { avatarUrl } from "../../lib/object-storage";
 
 const userSelect = { id: true, username: true, teamName: true, avatar: true } as const;
 
@@ -16,29 +15,25 @@ export async function GET(request: Request) {
         include: { creator: { select: userSelect }, acceptedBy: { select: userSelect }, decision: true },
         orderBy: { createdAt: "desc" },
     });
-    return NextResponse.json({ challenges: challenges.map((challenge: Prisma.ChallengeGetPayload<{ include: { creator: { select: typeof userSelect }; acceptedBy: { select: typeof userSelect }; decision: true } }>) => ({ ...challenge, stakeAmount: CHALLENGE_ENTRY_FEE, status: challenge.status.toLowerCase(), isPrivate: true, creator: challenge.creator, acceptedBy: challenge.acceptedBy })) });
+    return NextResponse.json({ challenges: challenges.map((challenge) => ({ ...challenge, creator: { ...challenge.creator, avatar: avatarUrl(challenge.creator.id, challenge.creator.avatar) }, acceptedBy: challenge.acceptedBy ? { ...challenge.acceptedBy, avatar: avatarUrl(challenge.acceptedBy.id, challenge.acceptedBy.avatar) } : null, status: challenge.status.toLowerCase(), isPrivate: true })) });
 }
 
 export async function POST() {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Log in before creating a challenge." }, { status: 401 });
-    const challenge = await prisma.$transaction(async (transaction) => {
-        const deduction = await transaction.user.updateMany({
-            where: { id: user.id, nobleCoins: { gte: CHALLENGE_ENTRY_FEE } },
-            data: { nobleCoins: { decrement: CHALLENGE_ENTRY_FEE } },
-        });
-        if (deduction.count !== 1) throw new Error("INSUFFICIENT_COINS");
+    try {
+        const challenge = await prisma.$transaction(async (transaction) => {
+        const active = await transaction.challenge.findFirst({ where: { status: { in: ["OPEN", "ACCEPTED", "REVIEW", "DISPUTED"] }, OR: [{ creatorId: user.id }, { acceptedById: user.id }] }, select: { id: true } });
+        if (active) throw new Error("PLAYER_BUSY");
         const createdChallenge = await transaction.challenge.create({
-            data: { stakeAmount: CHALLENGE_ENTRY_FEE, entryFeeCoins: CHALLENGE_ENTRY_FEE, creatorId: user.id },
+            data: { creatorId: user.id },
             include: { creator: { select: userSelect } },
         });
-        await transaction.ledgerEntry.create({ data: { challengeId: createdChallenge.id, userId: user.id, amount: -CHALLENGE_ENTRY_FEE, type: "COIN_ENTRY" } });
         return createdChallenge;
-    }).catch((createError: unknown) => {
-        if (createError instanceof Error && createError.message === "INSUFFICIENT_COINS") return null;
-        throw createError;
-    });
-    if (!challenge) return NextResponse.json({ error: `You need at least ${CHALLENGE_ENTRY_FEE} Noble Coins to create a challenge.` }, { status: 402 });
-
-    return NextResponse.json({ challenge: { ...challenge, status: "open", isPrivate: true } }, { status: 201 });
+        });
+        return NextResponse.json({ challenge: { ...challenge, creator: { ...challenge.creator, avatar: avatarUrl(challenge.creator.id, challenge.creator.avatar) }, status: "open", isPrivate: true } }, { status: 201 });
+    } catch (error) {
+        if (error instanceof Error && error.message === "PLAYER_BUSY") return NextResponse.json({ error: "You already have an active match. Open it from Matches before starting another.", code: "PLAYER_BUSY" }, { status: 409 });
+        throw error;
+    }
 }

@@ -1,178 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { ChangeEvent, useCallback, useEffect, useState } from "react";
 import { Challenge, MatchRoom } from "../../types";
-import { CHALLENGE_ENTRY_FEE } from "../../lib/economy";
-import FlexWinButton from "../../components/FlexWinButton";
 
-function formatChallengeCode(id: string | undefined) {
-    if (!id) return "INV1";
-    const letters = id.replace(/[^a-z]/gi, "").toUpperCase().padEnd(3, "X").slice(-3);
-    const number = id.split("").reduce((total, character) => total + character.charCodeAt(0), 0) % 10;
-    return `${letters}${number}`;
-}
+export default function MatchPage() {
+    const { id } = useParams<{ id: string }>(); const router = useRouter();
+    const [challenge, setChallenge] = useState<Challenge | null>(null); const [room, setRoom] = useState<MatchRoom | null>(null);
+    const [userId, setUserId] = useState(""); const [winnerId, setWinnerId] = useState(""); const [reason, setReason] = useState(""); const [error, setError] = useState(""); const [message, setMessage] = useState(""); const [busy, setBusy] = useState(false);
+    const loadRoom = useCallback(async () => { const response = await fetch(`/api/challenges/${id}/room`); if (response.ok) setRoom((await response.json()).room); }, [id]);
+    useEffect(() => { void Promise.all([fetch("/api/auth/me"), fetch(`/api/challenges/${id}`)]).then(async ([me, match]) => { const meData = await me.json(); const matchData = await match.json(); if (!match.ok) throw new Error(matchData.error); setUserId(meData.user?.id || ""); setChallenge(matchData.challenge); setWinnerId(matchData.challenge.creator.id); if (matchData.challenge.status !== "open") await loadRoom(); }).catch((loadError) => setError(loadError instanceof Error ? loadError.message : "Challenge unavailable.")); }, [id, loadRoom]);
+    useEffect(() => { if (!room) return; const timer = window.setInterval(() => { void loadRoom(); }, 3000); return () => window.clearInterval(timer); }, [loadRoom, room]);
 
-export default function MatchInvitePage() {
-    const params = useParams<{ id: string }>();
-    const router = useRouter();
-    const [challenge, setChallenge] = useState<Challenge | null>(null);
-    const [accepted, setAccepted] = useState(false);
-    const [error, setError] = useState("");
-    const [room, setRoom] = useState<MatchRoom | null>(null);
-    const [code, setCode] = useState("");
-    const [submitting, setSubmitting] = useState(false);
-    const [currentUserId, setCurrentUserId] = useState("");
-    const challengeCode = formatChallengeCode(params.id);
-
-    const loadRoom = useCallback(async () => {
-        const response = await fetch(`/api/challenges/${params.id}/room`);
-        if (!response.ok) return;
-        const data = await response.json();
-        setRoom(data.room);
-    }, [params.id]);
-
-    useEffect(() => {
-        fetch("/api/auth/me").then(async (response) => {
-            if (!response.ok) return;
-            const data = await response.json();
-            setCurrentUserId(data.user?.id || "");
-        });
-        fetch(`/api/challenges/${params.id}`)
-            .then(async (response) => {
-                const data = await response.json();
-                if (!response.ok) throw new Error(data.error);
-                setChallenge(data.challenge);
-                if (data.challenge.status !== "open") {
-                    setAccepted(true);
-                    await loadRoom();
-                }
-            })
-            .catch((loadError) => setError(loadError instanceof Error ? loadError.message : "Challenge unavailable."));
-    }, [loadRoom, params.id]);
-
-    useEffect(() => {
-        if (!accepted) return;
-        const interval = window.setInterval(loadRoom, 2500);
-        return () => window.clearInterval(interval);
-    }, [accepted, loadRoom, params.id]);
-
-    async function accept() {
-        const response = await fetch(`/api/challenges/${params.id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-        });
-        const data = await response.json();
-        if (!response.ok) {
-            setError(data.error || "Challenge is no longer available.");
-            return;
-        }
-        setChallenge(data.challenge);
-        setAccepted(true);
-        router.push("/matches");
-    }
-
-    async function sendRoomAction(action: string, value: string) {
-        if (!value.trim()) return;
-        const response = await fetch(`/api/challenges/${params.id}/room`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ action, ...(action === "reaction" ? { reaction: value } : { code: value }) }),
-        });
-        const data = await response.json();
-        if (response.ok) setRoom(data.room);
-        else setError(data.error || "Could not update the match room.");
-    }
-
-    async function shareChallengeOnWhatsApp() {
-        if (!challenge) return;
-        const url = `${window.location.origin}/match/${challenge.id}`;
-        const text = `Join my DLS challenge on Noble Gamers: ${url}`;
-        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
-    }
-
-    async function submitEvidence(event: React.ChangeEvent<HTMLInputElement>) {
-        const file = event.target.files?.[0];
-        if (!file) return;
-        setSubmitting(true);
-        const reader = new FileReader();
-        reader.onload = async () => {
-            const response = await fetch(`/api/challenges/${params.id}/room`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "submission", image: reader.result }),
-            });
-            const data = await response.json();
-            if (response.ok) setRoom(data.room);
-            else setError(data.error || "Could not submit the screenshot.");
-            setSubmitting(false);
-        };
-        reader.readAsDataURL(file);
-    }
-
-    const decision = room?.challenge.decision ?? challenge?.decision;
-    const verifiedChallenge = room?.challenge.verified ? room.challenge : challenge;
-    const isVerifiedWinner = Boolean(verifiedChallenge?.verified && decision?.winnerId === currentUserId);
-    const isCreator = challenge?.creator.id === currentUserId;
-    const matchStatus = room?.challenge.status ?? challenge?.status;
-    const canSubmitResult = matchStatus === "accepted" || matchStatus === "review" || matchStatus === "disputed";
-
-    return (
-        <div className="px-4 pt-6 space-y-6">
-            <div className="flex items-center justify-between">
-                <Link href="/" className="text-gold text-sm">Back to lobby</Link>
-                <button onClick={() => { void shareChallengeOnWhatsApp(); }} disabled={!challenge} className="rounded-xl bg-green-500 px-3 py-2 text-xs font-bold text-navy-950 disabled:opacity-50">Share on WhatsApp</button>
-            </div>
-            <div className="text-center pt-5">
-                <div className="text-6xl mb-4">⚽</div>
-                <p className="text-gold text-sm font-bold uppercase tracking-wider">Private challenge</p>
-                <h1 className="text-3xl font-extrabold mt-2">You have been challenged</h1>
-                <p className="text-slate-400 mt-2">A friend wants to settle this on the pitch.</p>
-            </div>
-            <div className="bg-navy-800 border border-gold/30 rounded-2xl p-5 text-center">
-                <p className="text-sm text-slate-400">Entry fee</p>
-                <p className="text-4xl font-extrabold text-gold mt-1">{CHALLENGE_ENTRY_FEE} <span className="text-lg">Noble Coins</span></p>
-                <div className="grid grid-cols-2 gap-3 mt-5 text-left">
-                    <div className="bg-navy-700 rounded-xl p-3"><p className="text-xs text-slate-400">Prize split</p><p className="font-bold text-green-400 mt-1">140 / 40 / 20 coins</p></div>
-                    <div className="bg-navy-700 rounded-xl p-3"><p className="text-xs text-slate-400">Challenge code</p><p className="font-bold mt-1">{challengeCode}</p></div>
-                </div>
-            </div>
-            {isVerifiedWinner && verifiedChallenge?.acceptedBy && decision?.creatorScore != null && decision.acceptedByScore != null && <FlexWinButton
-                opponentName={verifiedChallenge.creator.id === currentUserId ? verifiedChallenge.acceptedBy.username : verifiedChallenge.creator.username}
-                winnerScore={verifiedChallenge.creator.id === currentUserId ? decision.creatorScore : decision.acceptedByScore}
-                opponentScore={verifiedChallenge.creator.id === currentUserId ? decision.acceptedByScore : decision.creatorScore}
-            />}
-            {error ? <div className="bg-red-400/10 border border-red-400/30 rounded-2xl p-4 text-center text-red-200">{error}</div> : !accepted ? isCreator ? <div className="bg-navy-800 border border-navy-700 rounded-2xl p-4 text-center text-slate-300">Waiting for an opponent to join.</div> : <button onClick={accept} disabled={!challenge} className="w-full bg-gold text-navy-950 font-bold py-3 rounded-xl text-lg disabled:opacity-60">Accept challenge</button> : <section className="space-y-4">
-                {!canSubmitResult ? <div className="bg-green-400/10 border border-green-400/30 rounded-2xl p-4"><p className="text-green-400 font-bold">{matchStatus === "settled" ? "Match verified and complete" : "Challenge cancelled"}</p><p className="text-sm text-slate-300 mt-1">{matchStatus === "settled" ? "The verified result is recorded." : "This challenge is closed."}</p></div> : <>
-                <div className="bg-green-400/10 border border-green-400/30 rounded-2xl p-4"><p className="text-green-400 font-bold">Match room open</p><p className="text-sm text-slate-300 mt-1">Chat, exchange your in-game codes, then submit the final screenshot for review.</p></div>
-                <div className="bg-navy-800 border border-navy-700 rounded-2xl p-4 space-y-3">
-                    <div><h2 className="font-bold">Good game reactions</h2><p className="mt-1 text-xs text-slate-400">Quick reactions only — no private messaging.</p></div>
-                    <div className="flex flex-wrap gap-2">
-                        {["Nice game", "Almost", "Fair play", "Next time, better"].map((reaction) => <button key={reaction} onClick={() => { void sendRoomAction("reaction", reaction); }} className="rounded-full border border-gold/25 bg-gold/10 px-3 py-2 text-xs font-semibold text-gold transition hover:bg-gold hover:text-navy-950">{reaction}</button>)}
-                    </div>
-                    <div className="max-h-36 space-y-2 overflow-y-auto">{room?.messages.map((item) => <p key={item.id} className="text-sm"><span className="text-slate-400">{item.senderName}: </span><span className="font-semibold text-white">{item.text}</span></p>)}</div>
-                </div>
-                <div className="bg-navy-800 border border-navy-700 rounded-2xl p-4 space-y-3">
-                    <h2 className="font-bold">Exchange game codes</h2>
-                    <p className="text-xs text-slate-400">Enter your DLS in-game code so your opponent can find you. This is not a chat message.</p>
-                    <div className="flex gap-2"><input value={code} onChange={(event) => setCode(event.target.value)} placeholder="Enter your DLS code" className="min-w-0 flex-1 bg-navy-700 rounded-xl px-3 py-2" /><button onClick={() => { void sendRoomAction("code", code); setCode(""); }} className="bg-gold text-navy-950 font-bold px-4 rounded-xl">Share</button></div>
-                    <div className="space-y-1">{Object.entries(room?.playerCodes || {}).map(([playerId, playerCode]) => <p key={playerId} className="text-sm text-green-300">Code received: {playerCode}</p>)}</div>
-                </div>
-                <div className="bg-navy-800 border border-gold/30 rounded-2xl p-4 space-y-3"><h2 className="font-bold">Gemini screenshot verification</h2><p className="text-xs text-slate-400">Both players must submit the actual final-score screenshot. Gemini checks the pair; if it cannot confidently read a consistent score, the match goes to admin review. A screenshot upload alone is not approval.</p><label className="block text-center bg-gold text-navy-950 font-bold py-3 rounded-xl cursor-pointer">{submitting ? "Uploading..." : "Upload your result screenshot"}<input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={submitEvidence} /></label>{room?.submissions && Object.keys(room.submissions).length > 0 && <p className="text-xs text-slate-300">{Object.keys(room.submissions).length < 2 ? "Waiting for your opponent to submit their screenshot." : room.challenge.status === "settled" && room.challenge.verified ? "Gemini verified this result." : room.decision?.confidence != null ? `Gemini confidence: ${room.decision.confidence}%. ${room.decision.reasoning || "This result may need admin review."}` : "Both screenshots received. Verification is pending or requires admin review."}</p>}{Object.values(room?.submissions || {}).map((submission) => <div key={submission.submittedAt} className="flex items-center gap-3 text-sm text-green-300"><img src={submission.image} alt={`${submission.playerName} result`} className="w-12 h-12 rounded-lg object-cover" />{submission.playerName} submitted evidence</div>)}</div>
-                </>}
-            </section>}
-            {isCreator && challenge?.status === "open" && <button
-                onClick={async () => {
-                    const response = await fetch(`/api/challenges/${params.id}`, { method: "DELETE" });
-                    const data = await response.json();
-                    if (!response.ok) setError(data.error || "Could not cancel this challenge.");
-                    else router.push("/matches");
-                }}
-                className="w-full border border-red-400/40 text-red-200 font-semibold py-3 rounded-xl"
-            >{challenge.entryFeeCoins ? "Cancel challenge (refund 100 coins)" : "Cancel challenge"}</button>}
-            <p className="text-center text-xs text-slate-500">Only accept challenges from people you know.</p>
-        </div>
-    );
+    async function accept() { setBusy(true); const response = await fetch(`/api/challenges/${id}`, { method: "PATCH" }); const data = await response.json(); if (!response.ok) setError(data.error || "Challenge is no longer available."); else { setChallenge(data.challenge); await loadRoom(); } setBusy(false); }
+    function readImage(event: ChangeEvent<HTMLInputElement>, action: "submission" | "dispute") { const file = event.target.files?.[0]; if (!file) return; if (!["image/png", "image/jpeg", "image/webp"].includes(file.type) || file.size > 5 * 1024 * 1024) { setError("Choose a PNG, JPEG, or WebP screenshot up to 5 MB."); return; } const reader = new FileReader(); reader.onload = () => { void send(action, String(reader.result)); }; reader.readAsDataURL(file); }
+    async function send(action: string, image?: string) { setBusy(true); setError(""); const response = await fetch(`/api/challenges/${id}/room`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, image, winnerId, reason }) }); const data = await response.json(); if (!response.ok) setError(data.error || "Could not update this match."); else { setRoom(data.room); setMessage(action === "confirm" ? "Result confirmed and verified." : action === "dispute" ? "Dispute sent to admin review." : "Screenshot submitted. Your opponent can now confirm or dispute it."); setReason(""); } setBusy(false); }
+    if (!challenge) return <div className="px-4 pt-8 text-sm text-red-200">{error || "Loading match…"}</div>;
+    const creator = challenge.creator; const opponent = challenge.acceptedBy; const status = room?.challenge.status || challenge.status; const submissions = Object.entries(room?.submissions || {}); const oneSubmission = submissions.length === 1; const submittedByMe = Boolean(room?.submissions?.[userId]); const isCreator = creator.id === userId;
+    return <div className="px-4 pt-5 space-y-5"><div className="flex justify-between"><Link href="/matches" className="text-gold text-sm">← Matches</Link>{status === "open" && isCreator && <button onClick={async () => { const response = await fetch(`/api/challenges/${id}`, { method: "DELETE" }); if (response.ok) router.push("/matches"); else setError((await response.json()).error); }} className="text-sm text-red-300">Cancel</button>}</div><header><p className="text-xs uppercase tracking-widest text-gold">Free DLS challenge</p><h1 className="mt-1 text-3xl font-black">{creator.username} vs {opponent?.username || "Opponent pending"}</h1><p className="mt-2 text-sm text-slate-400">Find or create a free challenge → play DLS → submit a screenshot → confirm or dispute → see the verified result.</p></header>{error && <p className="rounded-xl border border-red-400/30 bg-red-400/10 p-3 text-sm text-red-200">{error}</p>}{message && <p className="rounded-xl border border-green-400/30 bg-green-400/10 p-3 text-sm text-green-200">{message}</p>}{status === "open" && !isCreator ? <button disabled={busy} onClick={() => { void accept(); }} className="w-full rounded-xl bg-gold py-3 font-bold text-navy-950">{busy ? "Joining…" : "Accept free challenge"}</button> : status === "open" ? <div className="rounded-2xl bg-navy-800 p-4 text-sm text-slate-300">Waiting for an opponent to accept. You can cancel while it is open.</div> : <section className="space-y-4"><div className="rounded-2xl border border-navy-700 bg-navy-800 p-4"><p className="font-bold">Match room · {status}</p><p className="mt-1 text-sm text-slate-400">Exchange your DLS code privately, play the match, and use the evidence controls below.</p></div>{status !== "settled" && status !== "cancelled" && <div className="rounded-2xl border border-gold/30 bg-navy-800 p-4 space-y-3"><h2 className="font-bold">Result evidence</h2><label className="text-sm text-slate-300">Winner shown in your screenshot<select value={winnerId} onChange={(event) => setWinnerId(event.target.value)} className="mt-2 w-full rounded-xl bg-navy-700 px-3 py-3"><option value={creator.id}>{creator.username}</option>{opponent && <option value={opponent.id}>{opponent.username}</option>}</select></label><label className="block cursor-pointer rounded-xl bg-gold px-3 py-3 text-center font-bold text-navy-950">{submittedByMe ? "Replace your screenshot" : "Submit result screenshot"}<input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(event) => readImage(event, "submission")} /></label>{oneSubmission && !submittedByMe && <button disabled={busy} onClick={() => { void send("confirm"); }} className="w-full rounded-xl border border-green-400/50 py-3 font-bold text-green-300">Confirm opponent’s result</button>}{oneSubmission && !submittedByMe && <><textarea value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} placeholder="If the result is wrong, explain why…" className="min-h-20 w-full rounded-xl bg-navy-700 px-3 py-3 text-sm" /><label className="block cursor-pointer rounded-xl border border-red-400/50 px-3 py-3 text-center font-bold text-red-200">Dispute with your screenshot<input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(event) => readImage(event, "dispute")} /></label></>}{status === "disputed" && <p className="text-sm text-amber-200">This match is with an admin. No win is awarded until review is complete.</p>}</div>}{submissions.length > 0 && <div className="space-y-2">{submissions.map(([playerId, submission]) => <div key={playerId} className="flex items-center gap-3 rounded-xl bg-navy-800 p-3 text-sm"><img src={submission.image} alt={`${submission.playerName} submitted evidence`} className="h-12 w-12 rounded-lg object-cover" /><span>{submission.playerName} submitted evidence</span></div>)}</div>}{status === "settled" && <div className="rounded-2xl border border-green-400/30 bg-green-400/10 p-4 text-green-200">Verified result recorded. This match no longer counts as active.</div>}</section>}<p className="text-center text-xs text-slate-500">If your opponent does not respond, the match stays unresolved and is not auto-awarded.</p></div>;
 }

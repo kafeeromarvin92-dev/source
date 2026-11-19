@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "../../lib/server-auth";
 import { prisma } from "../../lib/prisma";
+import { avatarUrl } from "../../lib/object-storage";
 
 type PlayerStats = {
     id: string;
@@ -9,9 +10,7 @@ type PlayerStats = {
     avatar: string;
     wins: number;
     losses: number;
-    goalDifference: number;
-    winStreak: number;
-    streakOpen: boolean;
+    matches: number;
 };
 
 export async function GET() {
@@ -39,45 +38,38 @@ export async function GET() {
         if (!decision?.winnerId || !match.acceptedBy) continue;
 
         const players = [match.creator, match.acceptedBy];
-        for (const [index, player] of players.entries()) {
+        for (const player of players) {
             let playerStats = stats.get(player.id);
             if (!playerStats) {
                 playerStats = {
                     ...player,
                     wins: 0,
                     losses: 0,
-                    goalDifference: 0,
-                    winStreak: 0,
-                    streakOpen: true,
+                    matches: 0,
                 };
                 stats.set(player.id, playerStats);
             }
 
-            const playerScore = index === 0 ? decision.creatorScore : decision.acceptedByScore;
-            const opponentScore = index === 0 ? decision.acceptedByScore : decision.creatorScore;
-            if (playerScore !== null && opponentScore !== null) playerStats.goalDifference += playerScore - opponentScore;
-
+            playerStats.matches += 1;
             if (decision.winnerId === player.id) {
                 playerStats.wins += 1;
-                if (playerStats.streakOpen) playerStats.winStreak += 1;
             } else {
                 playerStats.losses += 1;
-                playerStats.streakOpen = false;
             }
         }
     }
 
     const rankedPlayers = [...stats.values()]
-        .sort((left, right) => right.wins - left.wins || right.goalDifference - left.goalDifference || left.username.localeCompare(right.username))
+        .filter((player) => player.matches >= 3)
+        .sort((left, right) => right.wins - left.wins || (right.wins / right.matches) - (left.wins / left.matches) || right.matches - left.matches || left.username.localeCompare(right.username))
         .map((player, index) => ({
             id: player.id,
             username: player.username,
             teamName: player.teamName,
-            avatar: player.avatar,
+            avatar: avatarUrl(player.id, player.avatar),
             wins: player.wins,
-            losses: player.losses,
-            goalDifference: player.goalDifference,
-            winStreak: player.winStreak,
+            matches: player.matches,
+            winRate: Number(((player.wins / player.matches) * 100).toFixed(1)),
             rank: index + 1,
         }));
 
