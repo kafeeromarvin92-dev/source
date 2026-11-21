@@ -6,6 +6,8 @@ node_modules/
 !.env.example
 *.db
 *.db-journal
+*.tsbuildinfo
 npm-debug.log*
 .vercel
 .neon
+nob.txt
