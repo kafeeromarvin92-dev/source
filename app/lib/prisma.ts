@@ -1,11 +1,22 @@
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { attachDatabasePool } from "@vercel/functions";
+import { Pool } from "pg";
 
-const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) throw new Error("DATABASE_URL is required.");
-const adapter = new PrismaPg({ connectionString });
+const globalForPrisma = globalThis as typeof globalThis & {
+  prisma?: PrismaClient;
+  pgPool?: Pool;
+};
 
-export const prisma = globalForPrisma.prisma ?? new PrismaClient({ adapter });
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) throw new Error("DATABASE_URL must be set.");
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+const pool = globalForPrisma.pgPool ?? new Pool({ connectionString: databaseUrl });
+if (!globalForPrisma.pgPool) {
+  globalForPrisma.pgPool = pool;
+  if (process.env.VERCEL === "1") attachDatabasePool(pool);
+}
+
+export const prisma =
+  globalForPrisma.prisma ?? new PrismaClient({ adapter: new PrismaPg(pool) });
+globalForPrisma.prisma = prisma;

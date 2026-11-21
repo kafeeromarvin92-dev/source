@@ -3,7 +3,7 @@ import BottomNav from "./components/BottomNav";
 
 export const metadata = {
   title: "Noble Gamers",
-  description: "Competitive DLS and eFootball challenges",
+  description: "Competitive DLS Platform",
 };
 
 export default function RootLayout({
@@ -14,9 +14,9 @@ export default function RootLayout({
   return (
     <html lang="en" className="bg-navy-950 text-white">
       <body>
-        <div className="min-h-screen max-w-lg mx-auto pb-20">
+        <main id="main-content" className="screen-enter mx-auto min-h-screen w-full max-w-5xl pb-[calc(6rem+env(safe-area-inset-bottom))]">
           {children}
-        </div>
+        </main>
         <BottomNav />
       </body>
     </html>

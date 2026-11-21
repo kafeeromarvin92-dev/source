@@ -1,44 +1,18 @@
 import { NextResponse } from "next/server";
-import { MtnMomoError, requestMtnPayment } from "../../lib/mtn-momo";
 import { getCurrentUser } from "../../lib/server-auth";
 import { prisma } from "../../lib/prisma";
-
-const providers = new Set(["MTN", "AIRTEL"]);
 
 export async function GET() {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Log in to view your wallet." }, { status: 401 });
-    const transactions = await prisma.walletTransaction.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" }, take: 20 });
-    return NextResponse.json({ balance: user.walletBalance, transactions });
-}
-
-export async function POST(request: Request) {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Log in to use your wallet." }, { status: 401 });
-    const body = await request.json().catch(() => null) as { action?: string; amount?: number; phoneNumber?: string; provider?: string } | null;
-    const amount = Number(body?.amount);
-    const submittedPhone = typeof body?.phoneNumber === "string" ? body.phoneNumber.trim() : "";
-    const phoneNumber = submittedPhone.replace(/[\s-]/g, "").replace(/^0(7\d{8})$/, "+256$1");
-    const provider = typeof body?.provider === "string" ? body.provider.trim().toUpperCase() : "";
-    if (!Number.isInteger(amount) || amount < 500 || amount > 1_000_000) return NextResponse.json({ error: "Amount must be a whole number between 500 and 1,000,000 UGX." }, { status: 400 });
-    if (!/^\+?2567\d{8}$/.test(phoneNumber)) return NextResponse.json({ error: "Use a valid Ugandan mobile number, for example +256784261689." }, { status: 400 });
-    if (!providers.has(provider)) return NextResponse.json({ error: "Select Airtel Money or MTN MoMo as the payment provider." }, { status: 400 });
-    if (body?.action === "withdraw" && amount > user.walletBalance) return NextResponse.json({ error: "Your wallet balance is too low for this withdrawal." }, { status: 400 });
-    if (body?.action !== "deposit" && body?.action !== "withdraw") return NextResponse.json({ error: "Choose deposit or withdraw." }, { status: 400 });
-    if (body.action === "deposit" && provider === "AIRTEL") return NextResponse.json({ error: "Airtel deposits are not active yet. KBet payment API setup is required." }, { status: 503 });
-    const transaction = await prisma.walletTransaction.create({ data: { userId: user.id, type: body.action.toUpperCase(), amount, phoneNumber, provider: body.action === "withdraw" ? provider : "MTN_MOMO" } });
-    if (body.action === "withdraw") return NextResponse.json({ transaction, message: "Withdrawal request recorded for admin review." }, { status: 201 });
-
-    try {
-        const payment = await requestMtnPayment({ reference: transaction.id, phoneNumber, amount, description: `Noble Gamers wallet deposit for ${user.username}` });
-        const updatedTransaction = await prisma.walletTransaction.update({ where: { id: transaction.id }, data: { provider: "MTN_MOMO", providerRef: payment.providerReference } });
-        return NextResponse.json({ transaction: updatedTransaction, message: "Payment request sent. Approve the MTN MoMo prompt to complete your deposit." }, { status: 201 });
-    } catch (paymentError) {
-        const providerMessage = paymentError instanceof Error ? paymentError.message.slice(0, 200) : "MTN_MOMO_REQUEST_FAILED";
-        const providerStatus = paymentError instanceof MtnMomoError ? paymentError.status : null;
-        console.error("MTN MoMo payment request failed", { transactionId: transaction.id, status: providerStatus, message: providerMessage });
-        await prisma.walletTransaction.update({ where: { id: transaction.id }, data: { status: "REJECTED", providerRef: providerMessage } });
-        if (paymentError instanceof Error && paymentError.message === "MTN_PAYMENTS_NOT_CONFIGURED") return NextResponse.json({ error: "MTN Payments V1 is not configured. Add MTN_CONSUMER_KEY and MTN_CONSUMER_SECRET." }, { status: 503 });
-        return NextResponse.json({ error: `MTN rejected the request${providerStatus ? ` (HTTP ${providerStatus})` : ""}: ${providerMessage}` }, { status: 502 });
-    }
+    const wallet = await prisma.wallet.findUniqueOrThrow({
+        where: { userId: user.id },
+        include: { transactions: { orderBy: { createdAt: "desc" }, take: 50 } },
+    });
+    return NextResponse.json({
+        wallet: {
+            balance: wallet.balance,
+            transactions: wallet.transactions.map(({ id, type, amount, note, createdAt }) => ({ id, type, amount, note, createdAt })),
+        },
+    });
 }

@@ -1,8 +1,3 @@
-enum GameType {
-  DLS
-  EFOOTBALL
-}
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -28,27 +23,108 @@ enum DecisionStatus {
   SETTLED
 }
 
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+}
+
+enum CoinTransactionType {
+  STARTER_GRANT
+  ADMIN_GRANT
+  MATCH_STAKE
+  MATCH_PAYOUT
+  HOUSE_FEE
+  MATCH_REFUND
+  TOURNAMENT_ENTRY
+  TOURNAMENT_PAYOUT
+  TOURNAMENT_REFUND
+}
+
+enum TournamentStatus {
+  DRAFT
+  OPEN
+  LIVE
+  FINISHED
+}
+
+enum TournamentEntryStatus {
+  JOINED
+  ELIMINATED
+  CHAMPION
+}
+
+enum TournamentMatchStatus {
+  WAITING
+  READY
+  PLAYING
+  AWAITING_SCREENSHOT
+  DISPUTED
+  DONE
+  FORFEIT
+}
+
+enum TournamentFormat {
+  SINGLE_ELIMINATION
+}
+
 model User {
-  id            String        @id @default(cuid())
-  username      String
-  teamName      String
-  email         String        @unique
-  passwordHash  String
-  avatar        String
-  walletBalance Int           @default(0)
-  isAdmin       Boolean       @default(false)
-  createdAt     DateTime      @default(now())
-  sessions      Session[]
-  created       Challenge[]   @relation("createdChallenges")
-  accepted      Challenge[]   @relation("acceptedChallenges")
-  messages      MatchMessage[]
-  codes         PlayerCode[]
-  submissions   Submission[]
-  objections    Objection[]
-  decisions     MatchDecision[] @relation("adminDecisions")
-  wonDecisions  MatchDecision[] @relation("winnerDecisions")
-  ledgerEntries LedgerEntry[]
-  walletTransactions WalletTransaction[]
+  id                     String            @id @default(cuid())
+  username               String            @unique
+  teamName               String
+  email                  String            @unique
+  passwordHash           String
+  avatar                 String
+  isAdmin                Boolean           @default(false)
+  bio                    String?
+  gameTags               String            @default("DLS")
+  country                String?
+  createdAt              DateTime          @default(now())
+  lastSeenAt             DateTime?
+  sessions               Session[]
+  created                Challenge[]       @relation("createdChallenges")
+  accepted               Challenge[]       @relation("acceptedChallenges")
+  messages               MatchMessage[]
+  codes                  PlayerCode[]
+  submissions            Submission[]
+  objections             Objection[]
+  decisions              MatchDecision[]   @relation("adminDecisions")
+  wonDecisions           MatchDecision[]   @relation("winnerDecisions")
+  notifications          Notification[]
+  sentFriendRequests     FriendRequest[]   @relation("sentFriendRequests")
+  receivedFriendRequests FriendRequest[]   @relation("receivedFriendRequests")
+  wallet                 Wallet?
+  coinGrants             CoinTransaction[] @relation("coinTransactionAdmin")
+  createdTournaments     Tournament[]      @relation("tournamentAdmin")
+  tournamentEntries      TournamentEntry[]
+  tournamentMatchesAsA  TournamentMatch[]  @relation("tournamentPlayerA")
+  tournamentMatchesAsB  TournamentMatch[]  @relation("tournamentPlayerB")
+  tournamentWins         TournamentMatch[]  @relation("tournamentWinner")
+  settledTournamentMatches TournamentMatch[] @relation("tournamentMatchAdmin")
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String?
+  title     String
+  message   String
+  kind      String    @default("INFO")
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model FriendRequest {
+  id          String           @id @default(cuid())
+  requesterId String
+  recipientId String
+  status      FriendshipStatus @default(PENDING)
+  createdAt   DateTime         @default(now())
+  requester   User             @relation("sentFriendRequests", fields: [requesterId], references: [id], onDelete: Cascade)
+  recipient   User             @relation("receivedFriendRequests", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@unique([requesterId, recipientId])
+  @@index([recipientId, status])
+  @@index([requesterId, status])
 }
 
 model Session {
@@ -61,21 +137,122 @@ model Session {
 }
 
 model Challenge {
-  id          String          @id @default(cuid())
-  game        GameType        @default(DLS)
-  stakeAmount Int
-  status      ChallengeStatus @default(OPEN)
-  createdAt   DateTime        @default(now())
-  creatorId   String
-  acceptedById String?
-  creator     User            @relation("createdChallenges", fields: [creatorId], references: [id])
-  acceptedBy  User?           @relation("acceptedChallenges", fields: [acceptedById], references: [id])
-  messages    MatchMessage[]
-  codes       PlayerCode[]
-  submissions Submission[]
-  decision    MatchDecision?
-  objections  Objection[]
-  ledger      LedgerEntry[]
+  id                String            @id @default(cuid())
+  verified          Boolean           @default(false)
+  status            ChallengeStatus   @default(OPEN)
+  entryStake        Int               @default(100)
+  matchCode         String?           @unique
+  stakesCollectedAt DateTime?
+  createdAt         DateTime          @default(now())
+  creatorId         String
+  acceptedById      String?
+  creator           User              @relation("createdChallenges", fields: [creatorId], references: [id])
+  acceptedBy        User?             @relation("acceptedChallenges", fields: [acceptedById], references: [id])
+  messages          MatchMessage[]
+  codes             PlayerCode[]
+  submissions       Submission[]
+  decision          MatchDecision?
+  objections        Objection[]
+  coinTransactions  CoinTransaction[]
+}
+
+model Wallet {
+  id           String            @id @default(cuid())
+  accountKey   String            @unique
+  userId       String?           @unique
+  balance      Int               @default(0)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  user         User?             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  transactions CoinTransaction[]
+}
+
+model CoinTransaction {
+  id           String              @id @default(cuid())
+  walletId     String
+  challengeId  String?
+  tournamentId String?
+  createdById  String?
+  type         CoinTransactionType
+  amount       Int
+  referenceKey String              @unique
+  note         String?
+  createdAt    DateTime            @default(now())
+  wallet       Wallet              @relation(fields: [walletId], references: [id], onDelete: Restrict)
+  challenge    Challenge?          @relation(fields: [challengeId], references: [id], onDelete: SetNull)
+  tournament   Tournament?         @relation(fields: [tournamentId], references: [id], onDelete: SetNull)
+  createdBy    User?               @relation("coinTransactionAdmin", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([walletId, createdAt])
+  @@index([challengeId, type])
+  @@index([tournamentId, type])
+}
+
+model Tournament {
+  id                String             @id @default(cuid())
+  name              String
+  game              String             @default("DLS")
+  size              Int
+  entryFee          Int
+  prizeSplit        Json
+  startAt           DateTime
+  status            TournamentStatus   @default(DRAFT)
+  format            TournamentFormat   @default(SINGLE_ELIMINATION)
+  bestOf            Int                @default(1)
+  createdByAdminId  String
+  createdAt         DateTime           @default(now())
+  createdByAdmin    User               @relation("tournamentAdmin", fields: [createdByAdminId], references: [id], onDelete: Restrict)
+  entries           TournamentEntry[]
+  matches           TournamentMatch[]
+  coinTransactions  CoinTransaction[]
+
+  @@index([status, startAt])
+}
+
+model TournamentEntry {
+  id           String                 @id @default(cuid())
+  tournamentId String
+  userId       String
+  teamName     String
+  teamLogo     String?
+  seed         Int
+  status       TournamentEntryStatus @default(JOINED)
+  joinedAt     DateTime               @default(now())
+  tournament   Tournament             @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  user         User                   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([tournamentId, userId])
+  @@unique([tournamentId, seed])
+  @@index([userId, status])
+}
+
+model TournamentMatch {
+  id             String                @id @default(cuid())
+  tournamentId   String
+  round          Int
+  roundLabel     String
+  position       Int
+  playerAId      String?
+  playerBId      String?
+  challengeCode  String?               @unique
+  status         TournamentMatchStatus @default(WAITING)
+  scoreA         Int?
+  scoreB         Int?
+  winnerId       String?
+  settledByAdminId String?
+  scheduledAt    DateTime?
+  completedAt    DateTime?
+  tournament     Tournament            @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  playerA        User?                 @relation("tournamentPlayerA", fields: [playerAId], references: [id], onDelete: SetNull)
+  playerB        User?                 @relation("tournamentPlayerB", fields: [playerBId], references: [id], onDelete: SetNull)
+  winner         User?                 @relation("tournamentWinner", fields: [winnerId], references: [id], onDelete: SetNull)
+  settledByAdmin User?                 @relation("tournamentMatchAdmin", fields: [settledByAdminId], references: [id], onDelete: SetNull)
+
+  @@unique([tournamentId, round, position])
+  @@index([playerAId])
+  @@index([playerBId])
+  @@index([winnerId])
+  @@index([settledByAdminId])
 }
 
 model MatchMessage {
@@ -96,6 +273,7 @@ model PlayerCode {
   createdAt   DateTime  @default(now())
   challenge   Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
   player      User      @relation(fields: [playerId], references: [id])
+
   @@unique([challengeId, playerId])
 }
 
@@ -107,23 +285,27 @@ model Submission {
   createdAt   DateTime  @default(now())
   challenge   Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
   player      User      @relation(fields: [playerId], references: [id])
+
   @@unique([challengeId, playerId])
 }
 
 model MatchDecision {
-  id             String         @id @default(cuid())
-  challengeId    String         @unique
-  status         DecisionStatus @default(PENDING)
-  winnerId       String?
-  confidence     Int?
-  reasoning      String?
-  creatorScore   Int?
-  acceptedByScore Int?
-  decidedById    String?
-  decidedAt      DateTime?
-  challenge      Challenge      @relation(fields: [challengeId], references: [id], onDelete: Cascade)
-  winner         User?          @relation("winnerDecisions", fields: [winnerId], references: [id])
-  decidedBy      User?          @relation("adminDecisions", fields: [decidedById], references: [id])
+  id               String         @id @default(cuid())
+  challengeId      String         @unique
+  status           DecisionStatus @default(PENDING)
+  winnerId         String?
+  proposedWinnerId String?
+  confirmedById    String?
+  confirmedAt      DateTime?
+  confidence       Int?
+  reasoning        String?
+  creatorScore     Int?
+  acceptedByScore  Int?
+  decidedById      String?
+  decidedAt        DateTime?
+  challenge        Challenge      @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  winner           User?          @relation("winnerDecisions", fields: [winnerId], references: [id])
+  decidedBy        User?          @relation("adminDecisions", fields: [decidedById], references: [id])
 }
 
 model Objection {
@@ -134,29 +316,4 @@ model Objection {
   createdAt   DateTime  @default(now())
   challenge   Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
   player      User      @relation(fields: [playerId], references: [id])
-}
-
-model LedgerEntry {
-  id          String    @id @default(cuid())
-  challengeId String
-  userId      String?
-  amount      Int
-  type        String
-  createdAt   DateTime  @default(now())
-  challenge   Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
-  user        User?     @relation(fields: [userId], references: [id])
-}
-
-model WalletTransaction {
-  id          String   @id @default(cuid())
-  userId      String
-  type        String
-  status      String   @default("PENDING")
-  amount      Int
-  phoneNumber String
-  provider    String
-  providerRef String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

@@ -5,10 +5,8 @@ import { prisma } from "./prisma";
 
 const sessionCookie = "noble-gamers-session";
 const sessionDurationMs = 1000 * 60 * 60 * 24 * 30;
-const configuredAdminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
-
-export function isAdminUser(user: { email: string; isAdmin: boolean }) {
-    return Boolean(configuredAdminEmail && user.isAdmin && user.email.trim().toLowerCase() === configuredAdminEmail);
+export function canAdmin(user: { isAdmin: boolean }) {
+    return user.isAdmin;
 }
 
 function hashToken(token: string) {
@@ -34,7 +32,8 @@ export async function getCurrentUser() {
     if (!token) return null;
     const session = await prisma.session.findUnique({ where: { tokenHash: hashToken(token) }, include: { user: true } });
     if (!session || session.expiresAt < new Date()) return null;
-    return { ...session.user, isAdmin: isAdminUser(session.user) };
+    await prisma.user.update({ where: { id: session.user.id }, data: { lastSeenAt: new Date() } });
+    return session.user;
 }
 
 export async function destroySession() {

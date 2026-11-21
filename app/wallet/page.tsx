@@ -1,78 +1,69 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+
+type WalletTransaction = {
+    id: string;
+    type: string;
+    amount: number;
+    note: string | null;
+    createdAt: string;
+};
+
+const transactionLabels: Record<string, string> = {
+    STARTER_GRANT: "Starter points",
+    ADMIN_GRANT: "Admin grant",
+    MATCH_STAKE: "Match entry",
+    MATCH_PAYOUT: "Match payout",
+    HOUSE_FEE: "House fee",
+    MATCH_REFUND: "Match refund",
+};
 
 export default function WalletPage() {
-    const [balance, setBalance] = useState(0);
-    const [amount, setAmount] = useState("500");
-    const [phoneNumber, setPhoneNumber] = useState("+256");
-    const [provider, setProvider] = useState("MTN");
-    const [action, setAction] = useState<"deposit" | "withdraw">("deposit");
-    const [message, setMessage] = useState("");
+    const [balance, setBalance] = useState<number | null>(null);
+    const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
     const [error, setError] = useState("");
 
     useEffect(() => {
+        let mounted = true;
         void fetch("/api/wallet").then(async (response) => {
-            const data = await response.json();
-            if (response.ok) setBalance(data.balance);
-            else setError(data.error || "Could not load wallet.");
+            const data = await response.json().catch(() => null);
+            if (!mounted) return;
+            if (!response.ok) {
+                setError(data?.error || "Could not load your wallet.");
+                return;
+            }
+            setBalance(data.wallet.balance);
+            setTransactions(Array.isArray(data.wallet.transactions) ? data.wallet.transactions : []);
+        }).catch(() => {
+            if (mounted) setError("Could not reach your wallet. Check your connection and try again.");
         });
+        return () => { mounted = false; };
     }, []);
 
-    async function submit(event: FormEvent<HTMLFormElement>) {
-        event.preventDefault();
-        setError("");
-        setMessage("");
-        const response = await fetch("/api/wallet", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, amount: Number(amount), phoneNumber, provider }) });
-        const data = await response.json();
-        if (!response.ok) {
-            setError(data.error || "Could not record wallet request.");
-            return;
-        }
-        setMessage(data.message);
-        if (action === "deposit" && data.transaction?.id) {
-            const transactionId = data.transaction.id as string;
-            const poll = window.setInterval(async () => {
-                const statusResponse = await fetch(`/api/wallet/status/${transactionId}`);
-                if (!statusResponse.ok) return;
-                const statusData = await statusResponse.json();
-                if (statusData.transaction?.status === "COMPLETED") {
-                    window.clearInterval(poll);
-                    setBalance((current) => current + Number(statusData.transaction.amount));
-                    setMessage(`${provider === "AIRTEL" ? "Airtel Money" : "MTN MoMo"} payment received. Your wallet has been credited.`);
-                } else if (statusData.transaction?.status === "REJECTED") {
-                    window.clearInterval(poll);
-                    setError(`The ${provider === "AIRTEL" ? "Airtel Money" : "MTN MoMo"} payment was not completed.`);
-                }
-            }, 4000);
-            window.setTimeout(() => window.clearInterval(poll), 120000);
-        }
-    }
     return (
-        <div className="px-4 pt-4 space-y-6">
-            <h1 className="text-2xl font-extrabold">Wallet</h1>
+        <div className="mx-auto max-w-3xl space-y-5 px-4 pt-6 sm:px-6">
+            <Link href="/profile" className="text-sm font-bold text-slate-400 transition hover:text-gold">← Profile</Link>
+            <header className="rounded-3xl border border-gold/20 bg-gradient-to-br from-gold/10 via-navy-800 to-navy-950 p-5 sm:p-7">
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-gold">Virtual points</p>
+                <h1 className="mt-1 text-3xl font-black">Your wallet</h1>
+                <p className="mt-2 text-sm text-slate-400">Points are for Noble Gamers match entries and rewards. Real-money purchases are not available.</p>
+                <p className="mt-5 text-4xl font-black text-gold">{balance === null ? "…" : balance.toLocaleString()} <span className="text-base">pts</span></p>
+            </header>
 
-            <div className="bg-navy-800 border border-gold/30 rounded-2xl p-6">
-                <p className="text-sm text-slate-400">Available Balance</p>
-                <p className="text-4xl font-extrabold mt-1">
-                    {balance.toLocaleString()}
-                    <span className="text-lg text-gold ml-2">UGX</span>
-                </p>
-                <div className="flex gap-3 mt-6">
-                    <button type="button" onClick={() => setAction("deposit")} className={`flex-1 font-bold py-3 rounded-xl ${action === "deposit" ? "bg-gold text-navy-950" : "bg-navy-700 text-white"}`}>Deposit</button>
-                    <button type="button" onClick={() => setAction("withdraw")} className={`flex-1 font-bold py-3 rounded-xl ${action === "withdraw" ? "bg-gold text-navy-950" : "bg-navy-700 text-white"}`}>Withdraw</button>
-                </div>
-            </div>
-            <form onSubmit={submit} className="bg-navy-800 border border-navy-700 rounded-2xl p-5 space-y-4">
-                <h2 className="font-bold">{action === "deposit" ? "Deposit by mobile money" : "Withdraw to mobile money"}</h2>
-                <label className="block text-sm">Amount (UGX)<input required min={500} max={1000000} type="number" value={amount} onChange={(event) => setAmount(event.target.value)} className="mt-2 w-full bg-navy-700 rounded-xl px-3 py-2" /></label>
-                <label className="block text-sm">Mobile number<input required value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value)} placeholder="+2567XXXXXXXX" className="mt-2 w-full bg-navy-700 rounded-xl px-3 py-2" /></label>
-                <label className="block text-sm">Mobile money network<select value={provider} onChange={(event) => setProvider(event.target.value)} className="mt-2 w-full bg-navy-700 rounded-xl px-3 py-2"><option value="MTN">MTN MoMo</option><option value="AIRTEL">Airtel Money</option></select></label>
-                {action === "deposit" && provider === "AIRTEL" && <p className="text-amber-200 text-sm">Airtel deposits will be available after KBet payment API setup.</p>}
-                {error && <p className="text-red-300 text-sm">{error}</p>}
-                {message && <p className="text-green-300 text-sm">{message}</p>}
-                <button type="submit" className="w-full bg-gold text-navy-950 font-bold py-3 rounded-xl">Submit request</button>
-            </form>
+            {error && <p role="alert" className="rounded-xl border border-danger/30 bg-danger/10 p-3 text-sm text-red-200">{error} {error.includes("Log in") && <Link href="/login" className="font-bold underline">Sign in</Link>}</p>}
+            <section className="space-y-3">
+                <div className="flex items-end justify-between"><div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Auditable activity</p><h2 className="mt-1 text-xl font-black">Recent transactions</h2></div><span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Latest 50</span></div>
+                {transactions.length === 0 && balance !== null && !error && <div className="rounded-2xl border border-dashed border-white/15 bg-surface p-6 text-center"><h3 className="font-black">No point activity yet</h3><p className="mt-1 text-sm text-slate-400">Starter points, admin grants, match entries, payouts, and refunds will appear here.</p></div>}
+                {transactions.map((transaction) => (
+                    <article key={transaction.id} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-surface p-4">
+                        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${transaction.amount >= 0 ? "bg-neon/10 text-neon" : "bg-danger/10 text-red-200"}`} aria-hidden="true">{transaction.amount >= 0 ? "+" : "−"}</span>
+                        <div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{transactionLabels[transaction.type] || "Point transaction"}</p><p className="mt-1 truncate text-xs text-slate-500">{transaction.note || "Noble Gamers wallet activity"} · {new Date(transaction.createdAt).toLocaleString()}</p></div>
+                        <p className={`shrink-0 text-sm font-black ${transaction.amount >= 0 ? "text-neon" : "text-red-200"}`}>{transaction.amount > 0 ? "+" : ""}{transaction.amount.toLocaleString()}</p>
+                    </article>
+                ))}
+            </section>
         </div>
     );
 }
