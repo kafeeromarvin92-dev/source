@@ -8,10 +8,12 @@ export interface User {
     createdAt?: string;
     bio?: string | null;
     gameTags?: string;
-    country?: "Uganda" | "Kenya" | "Other" | null;
+    country?: string | null;
+    coinBalance?: number;
     totalWins: number;
     totalMatches: number;
     winRate: number;
+    currentStreak?: number;
 }
 
 export interface Challenge {
@@ -24,6 +26,8 @@ export interface Challenge {
         acceptedByScore?: number | null;
     } | null;
     status: "open" | "accepted" | "review" | "disputed" | "settled" | "cancelled";
+    entryStake: number;
+    matchCode?: string | null;
     isPrivate: boolean;
     createdAt: string;
     acceptedBy?: User;

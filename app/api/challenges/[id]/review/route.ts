@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { settleChallenge } from "../../../../lib/adjudication";
+import { refundChallenge, settleChallenge } from "../../../../lib/adjudication";
 import { canAdmin, getCurrentUser } from "../../../../lib/server-auth";
 import { prisma } from "../../../../lib/prisma";
 
@@ -43,7 +43,14 @@ export async function POST(request: Request, context: RouteContext) {
         const admin = await getCurrentUser();
         if (!admin || !canAdmin(admin) || !body.winnerId) return NextResponse.json({ error: "Admin session and winner are required." }, { status: 403 });
         const result = await settleChallenge(id, body.winnerId, admin.id);
-        if (!result) return NextResponse.json({ error: "Could not settle this match." }, { status: 409 });
+        if (!result) return NextResponse.json({ error: "This match is not eligible for admin settlement yet. One-sided evidence must be at least 10 minutes old." }, { status: 409 });
+        return NextResponse.json({ result });
+    }
+    if (body?.action === "admin-refund") {
+        const admin = await getCurrentUser();
+        if (!admin || !canAdmin(admin)) return NextResponse.json({ error: "Admin authorization required." }, { status: 403 });
+        const result = await refundChallenge(id, admin.id);
+        if (!result) return NextResponse.json({ error: "This match is not eligible for an admin refund yet. One-sided evidence must be at least 10 minutes old." }, { status: 409 });
         return NextResponse.json({ result });
     }
     return NextResponse.json({ error: "Unknown review action." }, { status: 400 });

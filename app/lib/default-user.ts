@@ -6,6 +6,7 @@ export const defaultUser: User = {
     teamName: "",
     email: "",
     avatar: "",
+    coinBalance: 0,
     totalWins: 0,
     totalMatches: 0,
     winRate: 0,

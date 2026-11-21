@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
+    "postinstall": "prisma generate",
     "admin:bootstrap": "node scripts/bootstrap-admin.mjs",
     "media:migrate": "node scripts/migrate-inline-media.mjs",
     "db:import-sqlite": "node scripts/migrate-sqlite-to-neon.mjs"
@@ -34,6 +36,8 @@
     "eslint-config-next": "16.3.5",
     "prisma": "^7.10.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vite": "latest",
+    "vitest": "latest"
   }
 }

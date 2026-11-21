@@ -1,65 +1,78 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Noble Gamers
 
-## Getting Started
+Noble Gamers is a mobile-first DLS competition app built with Next.js 16, React 19, Tailwind CSS 4, Prisma 7, and PostgreSQL on Neon. Players can challenge opponents, submit results for review, manage virtual coins, and enter single-elimination tournaments.
 
-First, run the development server:
+## Run locally
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+Requirements: Node.js and npm.
+
+1. Copy `.env.example` to `.env` and set `DATABASE_URL` (pooled PostgreSQL) and `DATABASE_URL_UNPOOLED` (direct PostgreSQL). Keep credentials out of source control.
+2. Install dependencies and start the development server:
+
+   ```powershell
+   npm.cmd ci
+   npm.cmd run dev
+   ```
+
+3. Open [http://localhost:3000](http://localhost:3000).
+
+Prisma Client is generated during install. To regenerate it manually after a schema change:
+
+```powershell
+npm.cmd exec prisma generate
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Main areas
 
-## Google sign-in
+- `/` — player lobby, online players, challenges, and match links.
+- `/matches`, `/match/[id]`, `/results` — existing challenge and result-review flow.
+- `/tournaments` and `/tournaments/[id]` — tournament listing, joining, and bracket.
+- `/admin/tournaments`, `/admin/tournaments/new`, `/admin/tournaments/[id]` — admin tournament management.
+- `/wallet`, `/leaderboard`, `/profile` — player account and standings.
 
-Copy the Google OAuth variables from `.env.example` into `.env` and set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_REDIRECT_URI`. In Google Cloud Console, create a Web application OAuth client and add the exact redirect URI configured in `GOOGLE_REDIRECT_URI` (for local development, `http://localhost:3000/api/auth/google/callback`). Google sign-in and account creation require a verified `@gmail.com` address.
+The mobile bottom navigation provides Play, Tournaments, Ranks, and Me; Matches remains linked from Play. Admins also get a gold Admin shortcut.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Player accounts and challenges
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Google sign-in is not required. Players register with a username, email, and password, then log back in with either their username or email and password. Passwords are stored as bcrypt hashes; the app never stores the plain password. Sessions last 30 days and use an HTTP-only, same-site cookie; session tokens are hashed in the database, and cookies are marked secure in production. Password reset is not self-service yet; players who forget a password need administrator help.
 
-## Learn More
+When a challenge is accepted, the app assigns one shared random match code (two uppercase letters and one digit) for both players. It is visible only to the match participants and administrators while the match is being played. The admin control room shows accepted matches separately from the result-review queue, which only contains matches with submitted evidence, disputes, or a settled result.
 
-To learn more about Next.js, take a look at the following resources:
+## Tournament release
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Admins create 4-, 8-, 16-, or 32-player single-elimination events, set entry fees and a prize split, and choose a start time. Players join an open event; the fee debit, seed assignment, bracket advancement, and final prize payments are transactional and recorded in the coin ledger. The final prize-split remainder goes to the winner.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+In this release, admins start a full bracket after its scheduled time and record tournament match results. Tournament ready checks, screenshot/dispute automation, automated timeout forfeits, push nudges, and reliability scoring are not enabled. Existing challenge settlement, first-sender, and dispute behavior is unchanged.
 
-## Deploy on Vercel
+## Database and deployment
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-
-## Neon database
-
-The application uses Neon's pooled `DATABASE_URL` at runtime. Prisma CLI migrations use the direct `DATABASE_URL_UNPOOLED`. Keep both values in an ignored local `.env` file and configure both as secrets in the hosting provider; never commit them.
-
-The PostgreSQL migration history is stored in `prisma/migrations-postgresql`. The original SQLite migrations remain under `prisma/migrations` for reference and are not applied to Neon. Deploy schema changes with:
+PostgreSQL schema and migrations live in `prisma/schema.prisma` and `prisma/migrations-postgresql`. Before deploying, confirm the target database and take a backup, then apply pending migrations:
 
 ```powershell
 npm.cmd exec prisma migrate deploy
 ```
 
-To copy the current application tables from the local `dev.db` into a newly migrated, empty Neon database, first make a verified backup, then run:
+The wallet migration creates player wallets and a transaction ledger, and grants existing accounts their launch balance. The tournament migration adds tournament, entry, match, and tournament-ledger records. Never apply migrations to an unintended database.
+
+To import active tables from local `dev.db` into a newly migrated, empty Neon database, first make and verify a backup. The importer refuses to write when target application tables are not empty:
 
 ```powershell
 Copy-Item -LiteralPath .\dev.db -Destination .\backups\dev.db.before-neon.db
 npm.cmd run db:import-sqlite
 ```
 
-The import uses `DATABASE_URL_UNPOOLED` and refuses to write if the target application tables are not empty. It imports the active Prisma models only; archived monetary records and removed Google sign-in fields remain preserved in the SQLite backup. Local media files are still stored under `.data/objects`; configure persistent object storage before deploying uploads to a serverless host.
-
-The existing-account admin recovery command supports SQLite and PostgreSQL. It only promotes an account that already exists and never creates an account or changes its password:
+Local media is stored under `.data/objects`; configure persistent object storage before deploying to a serverless host. The bootstrap command only promotes an existing account:
 
 ```powershell
-npm.cmd run admin:bootstrap -- --email=the-existing-account@example.com
+npm.cmd run admin:bootstrap -- --email=existing-account@example.com
+```
+
+## Checks
+
+```powershell
+npm.cmd test
+npm.cmd run lint
+npm.cmd exec tsc -- --noEmit
+npm.cmd exec prisma validate
+npm.cmd run build
 ```

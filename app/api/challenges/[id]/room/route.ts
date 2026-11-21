@@ -4,13 +4,14 @@ import { getCurrentUser } from "../../../../lib/server-auth";
 import { prisma } from "../../../../lib/prisma";
 import { validateEvidenceDataUrl } from "../../../../lib/match-rules";
 import { avatarUrl, evidenceUrl, storeImageDataUrl } from "../../../../lib/object-storage";
+import { confirmChallengeResult } from "../../../../lib/adjudication";
 
 type RouteContext = { params: Promise<{ id: string }> };
-const publicUserSelect = { id: true, username: true, teamName: true, avatar: true } as const;
+const publicUserSelect = { id: true, username: true, teamName: true, avatar: true, country: true } as const;
 const roomInclude = {
     creator: { select: publicUserSelect }, acceptedBy: { select: publicUserSelect },
     messages: { include: { sender: { select: { id: true, username: true } } }, orderBy: { createdAt: "asc" } },
-    codes: true, submissions: { include: { player: { select: publicUserSelect } } }, decision: true, objections: true,
+    codes: true, submissions: { include: { player: { select: publicUserSelect } }, orderBy: { createdAt: "asc" } }, decision: true, objections: true,
 } as const;
 const allowedReactions = new Set(["Nice game", "Almost", "Fair play", "Next time, better"]);
 
@@ -41,11 +42,16 @@ export async function POST(request: Request, context: RouteContext) {
         const winnerId = body.winnerId;
         if (!winnerId || ![room.creatorId, room.acceptedById].includes(winnerId)) return NextResponse.json({ error: "Choose which player won before submitting." }, { status: 400 });
         const stored = await storeImageDataUrl("evidence", body.image!, `${id}-${user.id}`);
-        await prisma.$transaction(async (transaction) => {
+        const saved = await prisma.$transaction(async (transaction) => {
+            await transaction.$queryRaw`SELECT "id" FROM "Challenge" WHERE "id" = ${id} FOR UPDATE`;
+            const current = await transaction.challenge.findUnique({ where: { id }, include: { submissions: true } });
+            if (!current || !["ACCEPTED", "REVIEW"].includes(current.status) || current.submissions.length >= 2) return false;
             await transaction.submission.upsert({ where: { challengeId_playerId: { challengeId: id, playerId: user.id } }, update: { image: stored.key, createdAt: new Date() }, create: { challengeId: id, playerId: user.id, image: stored.key } });
             await transaction.matchDecision.update({ where: { challengeId: id }, data: { proposedWinnerId: winnerId } });
-            await transaction.challenge.update({ where: { id }, data: { status: "REVIEW" } });
+            await transaction.challenge.update({ where: { id }, data: { status: "REVIEW", matchCode: null } });
+            return true;
         });
+        if (!saved) return NextResponse.json({ error: "This match is disputed or already has two submissions. Refresh the room before continuing." }, { status: 409 });
         const opponentId = room.creatorId === user.id ? room.acceptedById : room.creatorId;
         if (opponentId) await prisma.notification.create({ data: { userId: opponentId, title: "Result screenshot submitted", message: "Review the result, then confirm it or dispute it with your own screenshot.", kind: "MATCH" } });
     } else if (body?.action === "confirm") {
@@ -53,25 +59,30 @@ export async function POST(request: Request, context: RouteContext) {
         if (!submitter || submitter === user.id || room.submissions.length !== 1) return NextResponse.json({ error: "Only the opponent can confirm the first submitted result." }, { status: 409 });
         const winnerId = body.winnerId || room.decision?.proposedWinnerId;
         if (!winnerId || ![room.creatorId, room.acceptedById].includes(winnerId)) return NextResponse.json({ error: "A valid winner is required." }, { status: 400 });
-        await prisma.$transaction(async (transaction) => {
-            await transaction.challenge.update({ where: { id }, data: { status: "SETTLED", verified: true } });
-            await transaction.matchDecision.update({ where: { challengeId: id }, data: { status: "SETTLED", winnerId, confirmedById: user.id, confirmedAt: new Date(), decidedAt: new Date() } });
-            await transaction.notification.createMany({ data: [room.creatorId, room.acceptedById].map((userId) => ({ userId, title: "Match result confirmed", message: "Both players confirmed the result. Your verified record is updated.", kind: "RESULT" })) });
-        });
+        const result = await confirmChallengeResult(id, winnerId, user.id);
+        if (!result) return NextResponse.json({ error: "This result can no longer be confirmed. Refresh the match room and review its current status." }, { status: 409 });
     } else if (body?.action === "dispute" || body?.action === "object") {
         const evidence = body.image ? validateEvidenceDataUrl(body.image) : { ok: false as const, error: "A dispute must include your own result screenshot." };
         if (!evidence.ok) return NextResponse.json({ error: evidence.error }, { status: 400 });
         if (!body.reason?.trim()) return NextResponse.json({ error: "Explain what is disputed." }, { status: 400 });
+        if (room.status !== "REVIEW" || room.submissions.length !== 1 || room.submissions[0].playerId === user.id) {
+            return NextResponse.json({ error: "A dispute requires one result submitted by your opponent. Refresh the match room and review its current status." }, { status: 409 });
+        }
         const winnerId = body.winnerId;
         if (!winnerId || ![room.creatorId, room.acceptedById].includes(winnerId)) return NextResponse.json({ error: "Choose which player won in your screenshot." }, { status: 400 });
         const stored = await storeImageDataUrl("evidence", body.image!, `${id}-${user.id}`);
-        await prisma.$transaction(async (transaction) => {
+        const disputed = await prisma.$transaction(async (transaction) => {
+            await transaction.$queryRaw`SELECT "id" FROM "Challenge" WHERE "id" = ${id} FOR UPDATE`;
+            const current = await transaction.challenge.findUnique({ where: { id }, include: { submissions: true } });
+            if (!current || current.status !== "REVIEW" || current.submissions.length !== 1 || current.submissions[0].playerId === user.id) return false;
             await transaction.submission.upsert({ where: { challengeId_playerId: { challengeId: id, playerId: user.id } }, update: { image: stored.key, createdAt: new Date() }, create: { challengeId: id, playerId: user.id, image: stored.key } });
             await transaction.objection.create({ data: { challengeId: id, playerId: user.id, reason: body.reason!.trim().slice(0, 500) } });
-            await transaction.challenge.update({ where: { id }, data: { status: "DISPUTED" } });
+            await transaction.challenge.update({ where: { id }, data: { status: "DISPUTED", matchCode: null } });
             await transaction.matchDecision.update({ where: { challengeId: id }, data: { status: "DISPUTED", proposedWinnerId: winnerId } });
             await transaction.notification.createMany({ data: [room.creatorId, room.acceptedById].map((userId) => ({ userId, title: "Match sent to admin review", message: "This result is disputed. An admin will review both screenshots; no win is awarded yet.", kind: "MATCH" })) });
+            return true;
         });
+        if (!disputed) return NextResponse.json({ error: "This result has already changed. Refresh the match room before disputing it." }, { status: 409 });
     } else return NextResponse.json({ error: "Invalid match-room action." }, { status: 400 });
 
     const updated = await prisma.challenge.findUnique({ where: { id }, include: roomInclude });

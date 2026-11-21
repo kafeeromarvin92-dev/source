@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import TeamLogo from "../components/TeamLogo";
 
 type Friend = { id: string; user: { id: string; username: string; teamName: string; avatar: string; email: string | null } };
 type FriendRequest = { id: string; user: { id: string; username: string; teamName: string; avatar: string } };
@@ -88,7 +89,7 @@ export default function FriendsPage() {
             {incoming.length > 0 && <section className="space-y-3">
                 <h2 className="font-bold">Friend requests <span className="text-gold">({incoming.length})</span></h2>
                 {incoming.map((request) => <article key={request.id} className="flex items-center justify-between gap-3 rounded-2xl border border-gold/20 bg-gold/5 p-4">
-                    <div><p className="font-bold">{request.user.username}</p><p className="text-xs text-slate-400">{request.user.teamName}</p></div>
+                    <div className="flex min-w-0 items-center gap-3"><TeamLogo avatar={request.user.avatar} alt={`${request.user.teamName} logo`} size={44} /><div className="min-w-0"><p className="truncate font-bold">{request.user.username}</p><p className="truncate text-xs text-slate-400">{request.user.teamName}</p></div></div>
                     <div className="flex gap-2">
                         <button onClick={() => { void updateRequest(request.id, "accept"); }} className="rounded-lg bg-green-400 px-3 py-2 text-xs font-bold text-navy-950">Accept</button>
                         <button onClick={() => { void updateRequest(request.id, "decline"); }} className="rounded-lg bg-navy-700 px-3 py-2 text-xs font-bold">Decline</button>
@@ -99,11 +100,10 @@ export default function FriendsPage() {
             <section className="space-y-3">
                 <h2 className="font-bold">Your friends <span className="text-slate-500">({friends.length})</span></h2>
                 {!loading && friends.length === 0 && <p className="rounded-2xl border border-dashed border-navy-600 p-5 text-center text-sm text-slate-400">Your squad is empty. Search a username to send your first request.</p>}
-                {friends.map((friend) => <article key={friend.id} className="flex items-center justify-between gap-3 rounded-2xl border border-navy-700 bg-navy-800 p-4">
-                    <Link href={`/players/${friend.user.id}`} className="min-w-0">
-                        <p className="truncate font-bold">{friend.user.username}</p>
-                        <p className="truncate text-xs text-slate-400">{friend.user.teamName}</p>
-                        <p className="mt-1 truncate text-xs text-gold">{friend.user.email}</p>
+                {friends.map((friend) => <article key={friend.id} className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-surface p-4">
+                    <Link href={`/players/${friend.user.id}`} className="flex min-w-0 items-center gap-3">
+                        <TeamLogo avatar={friend.user.avatar} alt={`${friend.user.teamName} logo`} size={48} />
+                        <span className="min-w-0"><span className="block truncate font-bold">{friend.user.teamName}</span><span className="mt-0.5 block truncate text-xs text-slate-400">[@{friend.user.username}]</span><span className="mt-1 block truncate text-xs text-gold">{friend.user.email}</span></span>
                     </Link>
                     <button onClick={() => { void updateRequest(friend.id, "remove"); }} className="shrink-0 rounded-lg border border-navy-600 px-3 py-2 text-xs text-slate-300">Remove</button>
                 </article>)}
@@ -111,8 +111,8 @@ export default function FriendsPage() {
 
             {outgoing.length > 0 && <section className="space-y-3">
                 <h2 className="font-bold">Sent requests</h2>
-                {outgoing.map((request) => <div key={request.id} className="rounded-xl bg-navy-800 px-4 py-3 text-sm">
-                    <span className="font-semibold">{request.user.username}</span><span className="ml-2 text-xs text-slate-400">Waiting for them to accept</span>
+                {outgoing.map((request) => <div key={request.id} className="flex items-center gap-3 rounded-xl border border-white/10 bg-surface px-4 py-3 text-sm">
+                    <TeamLogo avatar={request.user.avatar} alt={`${request.user.teamName} logo`} size={40} /><span className="min-w-0 flex-1"><span className="block truncate font-semibold">{request.user.teamName}</span><span className="block truncate text-xs text-slate-400">[@{request.user.username}] · Waiting for them to accept</span></span>
                 </div>)}
             </section>}
         </div>
