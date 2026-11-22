@@ -43,6 +43,7 @@ export default function TournamentBracket({
     viewerId,
     admin = false,
     onChooseWinner,
+    onScheduleMatch,
     onOpenMatch,
 }: {
     matches: TournamentMatchView[];

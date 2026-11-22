@@ -89,6 +89,12 @@ export default function ProfilePage() {
         } catch { setNotice("Could not reach Noble Gamers. Your changes were not saved."); } finally { setSaving(false); }
     }
 
+    async function logout() {
+        await fetch("/api/auth/logout", { method: "POST" });
+        router.replace("/login");
+        router.refresh();
+    }
+
     if (loading) return <div className="mx-auto max-w-3xl space-y-5 px-4 pt-6 sm:px-6"><div className="skeleton h-72 rounded-3xl" /><div className="skeleton h-28 rounded-2xl" /><div className="skeleton h-52 rounded-2xl" /></div>;
     if (!user) return null;
 
@@ -96,6 +102,11 @@ export default function ProfilePage() {
     return (
         <div className="mx-auto max-w-4xl space-y-5 px-4 pt-6 sm:px-6">
             <header className="relative overflow-hidden rounded-3xl border border-gold/30 bg-gradient-to-br from-gold/15 via-navy-800 to-navy-950 p-5 text-center shadow-2xl sm:p-8"><div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,199,0,.16),transparent_42%)]" /><div className="relative mx-auto w-fit"><TeamLogo avatar={user.avatar} alt={`${user.teamName || user.username} team logo`} size={124} /><span className="absolute -bottom-1 -right-1 rounded-full border-2 border-navy-800 bg-neon px-2 py-1 text-[9px] font-black uppercase tracking-wider text-navy-950">Live profile</span></div><button type="button" onClick={() => { setEditing(true); setNotice(""); }} className="mt-4 rounded-full border border-gold/30 bg-gold/10 px-4 py-2 text-xs font-black text-gold hover:bg-gold/20">Edit logo &amp; details</button><p className="mt-5 text-[10px] font-black uppercase tracking-[0.24em] text-gold">Player profile</p><h1 className="mt-1 text-3xl font-black tracking-tight">{user.username}</h1><p className="mt-1 text-sm font-bold text-slate-200">{user.teamName || "Team name not set"}</p><p className="mt-2 text-sm text-slate-400"><CountryFlag country={user.country} /> {user.country || "Country not set"}</p><div className="mx-auto mt-5 max-w-md rounded-2xl border border-white/10 bg-black/20 p-4 text-left"><div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Leaderboard status</p><p className="mt-1 font-black">{rank ? `Rank #${rank}` : "Not ranked yet"}</p></div><span className="rounded-full bg-neon/10 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-neon">{user.totalMatches >= 3 ? "Eligible" : `${user.totalMatches}/3 matches`}</span></div><div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-neon to-gold transition-all duration-700" style={{ width: `${qualification}%` }} /></div></div></header>
+
+            <section aria-label="Account actions" className="flex flex-wrap items-center justify-center gap-2 rounded-2xl border border-white/10 bg-surface p-3">
+                {user.isAdmin && <Link href="/admin" className="rounded-xl bg-gold px-4 py-2.5 text-xs font-black text-navy-950">Admin control room</Link>}
+                <button type="button" onClick={() => { void logout(); }} className="rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-xs font-black text-slate-200 hover:bg-white/10">Log out</button>
+            </section>
 
             {error && <div role="alert" className="flex items-center justify-between gap-3 rounded-xl border border-danger/30 bg-danger/10 p-3 text-sm text-red-200"><span>{error}</span><button type="button" onClick={() => { void loadProfile(); }} className="rounded-lg border border-danger/40 px-3 py-2 text-xs font-black">Retry</button></div>}
             {notice && <p role="status" className="rounded-xl border border-gold/30 bg-gold/10 p-3 text-sm text-gold-light">{notice}</p>}
