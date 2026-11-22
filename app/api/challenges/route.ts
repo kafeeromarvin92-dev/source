@@ -11,8 +11,9 @@ export async function GET(request: Request) {
     const requestUrl = new URL(request.url);
     const mine = requestUrl.searchParams.get("mine") === "true";
     if (mine && !user) return NextResponse.json({ error: "Log in to view your matches." }, { status: 401 });
+    const cutoff = new Date(Date.now() - 2 * 60 * 1000);
     const challenges = await prisma.challenge.findMany({
-        where: mine ? { OR: [{ creatorId: user!.id }, { acceptedById: user!.id }] } : { status: "OPEN" },
+        where: mine ? { OR: [{ creatorId: user!.id }, { acceptedById: user!.id }] } : { status: "OPEN", creator: { lastSeenAt: { gte: cutoff } } },
         include: { creator: { select: userSelect }, acceptedBy: { select: userSelect }, decision: true },
         orderBy: { createdAt: "desc" },
     });
@@ -29,7 +30,12 @@ export async function POST(request: Request) {
         const challenge = await prisma.$transaction(async (transaction) => {
         const active = await transaction.challenge.findFirst({ where: { status: { in: ["OPEN", "ACCEPTED", "REVIEW", "DISPUTED"] }, OR: [{ creatorId: user.id }, { acceptedById: user.id }] }, select: { id: true } });
         if (active) throw new Error("PLAYER_BUSY");
-        const wallet = await transaction.wallet.findUniqueOrThrow({ where: { userId: user.id }, select: { balance: true } });
+        const wallet = await transaction.wallet.upsert({
+            where: { userId: user.id },
+            update: {},
+            create: { accountKey: `player:${user.id}`, userId: user.id, balance: 1000 },
+            select: { balance: true },
+        });
         if (wallet.balance < entryStake) throw new Error("INSUFFICIENT_POINTS");
         const createdChallenge = await transaction.challenge.create({
             data: { creatorId: user.id, entryStake },
@@ -41,6 +47,7 @@ export async function POST(request: Request) {
     } catch (error) {
         if (error instanceof Error && error.message === "PLAYER_BUSY") return NextResponse.json({ error: "You already have an active match. Open it from Matches before starting another.", code: "PLAYER_BUSY" }, { status: 409 });
         if (error instanceof Error && error.message === "INSUFFICIENT_POINTS") return NextResponse.json({ error: "Your wallet does not have enough points for that entry stake.", code: "INSUFFICIENT_POINTS" }, { status: 409 });
-        throw error;
+        console.error("CREATE_CHALLENGE_FAILED", error);
+        return NextResponse.json({ error: String(error), code: (error as { code?: string }).code }, { status: 500 });
     }
 }

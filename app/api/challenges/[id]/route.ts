@@ -70,7 +70,38 @@ export async function DELETE(_request: Request, context: RouteContext) {
     const { id } = await context.params;
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Log in before cancelling a challenge." }, { status: 401 });
-    const cancelled = await prisma.challenge.updateMany({ where: { id, creatorId: user.id, status: "OPEN" }, data: { status: "CANCELLED" } });
-    if (cancelled.count !== 1) return NextResponse.json({ error: "Only an open challenge can be cancelled." }, { status: 409 });
-    return NextResponse.json({ message: "Challenge cancelled." });
+    const result = await prisma.$transaction(async (transaction) => {
+        const challenge = await transaction.challenge.findUnique({ where: { id }, select: { creatorId: true, acceptedById: true, status: true, entryStake: true } });
+        if (!challenge || !["OPEN", "ACCEPTED"].includes(challenge.status) || ![challenge.creatorId, challenge.acceptedById].includes(user.id)) return null;
+
+        const cancelled = await transaction.challenge.updateMany({
+            where: { id, status: challenge.status },
+            data: { status: "CANCELLED", matchCode: null },
+        });
+        if (cancelled.count !== 1) return null;
+
+        if (challenge.status === "ACCEPTED" && challenge.acceptedById) {
+            const playerIds = [challenge.creatorId, challenge.acceptedById];
+            const wallets = await transaction.wallet.findMany({ where: { userId: { in: playerIds } }, select: { id: true, userId: true } });
+            if (wallets.length !== playerIds.length) throw new Error("WALLET_MISSING_FOR_REFUND");
+            for (const wallet of wallets) {
+                await transaction.wallet.update({ where: { id: wallet.id }, data: { balance: { increment: challenge.entryStake } } });
+                await transaction.coinTransaction.create({
+                    data: {
+                        walletId: wallet.id,
+                        challengeId: id,
+                        type: "MATCH_REFUND",
+                        amount: challenge.entryStake,
+                        referenceKey: `match:${id}:refund:${wallet.userId}`,
+                        note: "Cancelled match stake refund",
+                    },
+                });
+            }
+        }
+
+        return { status: challenge.status };
+    });
+
+    if (!result) return NextResponse.json({ error: "Only an open or accepted challenge involving you can be cancelled." }, { status: 409 });
+    return NextResponse.json({ message: result.status === "ACCEPTED" ? "Match cancelled and both entry stakes refunded." : "Challenge cancelled." });
 }

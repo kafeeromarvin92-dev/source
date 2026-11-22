@@ -117,7 +117,7 @@ export default function MatchesPage() {
                             </div>
                             <div className="rounded-xl border border-white/5 bg-navy-950/50 px-3 py-3"><p className="text-[9px] font-black uppercase tracking-wider text-slate-500">Result status</p><p className={`mt-1 text-sm font-bold ${status === "SETTLED" ? "text-neon" : status === "DISPUTED" ? "text-red-200" : "text-slate-200"}`}>{summary}</p></div>
                             <div className="flex gap-2">
-                                {status === "OPEN" && isCreator && <button type="button" disabled={cancelling === match.id} onClick={() => { void cancelChallenge(match.id); }} className="rounded-xl border border-danger/30 px-3 py-3 text-xs font-black text-red-200 transition hover:bg-danger/10 disabled:opacity-50">{cancelling === match.id ? "Cancelling…" : "Cancel"}</button>}
+                                {["OPEN", "ACCEPTED"].includes(status) && (isCreator || match.acceptedBy?.id === currentUserId) && <button type="button" disabled={cancelling === match.id} onClick={() => { void cancelChallenge(match.id); }} className="rounded-xl border border-danger/30 px-3 py-3 text-xs font-black text-red-200 transition hover:bg-danger/10 disabled:opacity-50">{cancelling === match.id ? "Cancelling…" : status === "ACCEPTED" ? "Cancel & refund" : "Cancel"}</button>}
                                 <Link href={`/match/${match.id}`} className="flex-1 rounded-xl bg-white/5 px-3 py-3 text-center text-xs font-black text-white transition hover:bg-gold hover:text-navy-950">Open match room →</Link>
                             </div>
                         </article>

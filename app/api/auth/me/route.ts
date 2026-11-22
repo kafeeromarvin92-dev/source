@@ -14,7 +14,12 @@ export async function GET() {
             where: { status: "SETTLED", verified: true, OR: [{ creatorId: user.id }, { acceptedById: user.id }] },
             select: { decision: { select: { winnerId: true, decidedAt: true } } },
         }),
-        prisma.wallet.findUniqueOrThrow({ where: { userId: user.id }, select: { balance: true } }),
+        prisma.wallet.upsert({
+            where: { userId: user.id },
+            update: {},
+            create: { accountKey: `player:${user.id}`, userId: user.id, balance: 1000 },
+            select: { balance: true },
+        }),
     ]);
     const orderedMatches = recentMatches.sort((left, right) => (right.decision?.decidedAt?.getTime() ?? 0) - (left.decision?.decidedAt?.getTime() ?? 0));
     let currentStreak = 0;

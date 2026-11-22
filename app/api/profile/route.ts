@@ -26,6 +26,11 @@ export async function PATCH(request: Request) {
     if (duplicate) return NextResponse.json({ error: "That username is already taken." }, { status: 409 });
     const storedAvatar = avatarData ? (await storeImageDataUrl("avatars", avatarData ? avatar : "", user.id)).key : avatar;
     const updated = await prisma.user.update({ where: { id: user.id }, data: { username, teamName, avatar: storedAvatar, bio, gameTags, country } });
-    const wallet = await prisma.wallet.findUniqueOrThrow({ where: { userId: user.id }, select: { balance: true } });
+    const wallet = await prisma.wallet.upsert({
+        where: { userId: user.id },
+        update: {},
+        create: { accountKey: `player:${user.id}`, userId: user.id, balance: 1000 },
+        select: { balance: true },
+    });
     return NextResponse.json({ user: { id: updated.id, username: updated.username, teamName: updated.teamName, email: updated.email, avatar: avatarUrl(updated.id, updated.avatar), isAdmin: updated.isAdmin, bio: updated.bio, gameTags: updated.gameTags, country: updated.country, coinBalance: wallet.balance } });
 }
