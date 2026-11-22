@@ -87,7 +87,7 @@ export async function POST(request: Request) {
                     round,
                     roundLabel,
                     position,
-                    scheduledAt: round === 1 ? startAt : null,
+                    scheduledAt: null,
                 });
             }
         }

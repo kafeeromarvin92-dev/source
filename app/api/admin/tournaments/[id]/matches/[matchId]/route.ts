@@ -10,6 +10,66 @@ function isNonNegativeInteger(value: unknown): value is number {
     return typeof value === "number" && Number.isInteger(value) && value >= 0;
 }
 
+export async function PATCH(request: Request, context: RouteContext) {
+    const admin = await getCurrentUser();
+    if (!admin || !canAdmin(admin)) return NextResponse.json({ error: "Admin authorization required." }, { status: 403 });
+    const { id, matchId } = await context.params;
+    const body = await request.json().catch(() => null) as {
+        action?: unknown;
+        scheduledAt?: unknown;
+        playByAt?: unknown;
+    } | null;
+    if (!body || body.action !== "schedule" || typeof body.scheduledAt !== "string" || typeof body.playByAt !== "string") {
+        return NextResponse.json({ error: "A scheduled start and play-by time are required." }, { status: 400 });
+    }
+    const scheduledAt = new Date(body.scheduledAt);
+    const playByAt = new Date(body.playByAt);
+    if (Number.isNaN(scheduledAt.getTime()) || Number.isNaN(playByAt.getTime()) || playByAt.getTime() <= scheduledAt.getTime()) {
+        return NextResponse.json({ error: "The play-by time must be later than the scheduled start." }, { status: 400 });
+    }
+
+    try {
+        const result = await prisma.$transaction(async (transaction) => {
+            await transaction.$queryRaw`SELECT "id" FROM "Tournament" WHERE "id" = ${id} FOR UPDATE`;
+            const match = await transaction.tournamentMatch.findUnique({
+                where: { id: matchId },
+                include: { tournament: { select: { id: true, name: true, status: true } } },
+            });
+            if (!match || match.tournamentId !== id) throw new Error("MATCH_NOT_FOUND");
+            if (match.tournament.status !== "LIVE") throw new Error("NOT_LIVE");
+            if (!match.playerAId || !match.playerBId) throw new Error("MATCH_NOT_READY");
+            if (!["WAITING", "READY"].includes(match.status)) throw new Error("MATCH_NOT_SCHEDULABLE");
+
+            await transaction.tournamentMatch.update({
+                where: { id: match.id },
+                data: { scheduledAt, playByAt, status: "READY" },
+            });
+            await transaction.notification.createMany({
+                data: [match.playerAId, match.playerBId].map((userId) => ({
+                    userId,
+                    title: "Tournament match scheduled",
+                    message: `${match.tournament.name} · ${match.roundLabel} match ${match.position} starts ${scheduledAt.toISOString()} and must be played by ${playByAt.toISOString()}.`,
+                    kind: "TOURNAMENT",
+                })),
+            });
+            return { scheduledAt, playByAt };
+        });
+        return NextResponse.json({ result });
+    } catch (error) {
+        if (error instanceof Error) {
+            const errors: Record<string, { message: string; status: number }> = {
+                MATCH_NOT_FOUND: { message: "Match not found.", status: 404 },
+                NOT_LIVE: { message: "Tournament is not live.", status: 409 },
+                MATCH_NOT_READY: { message: "Both players must be assigned before scheduling this match.", status: 409 },
+                MATCH_NOT_SCHEDULABLE: { message: "This match cannot be scheduled in its current state.", status: 409 },
+            };
+            const known = errors[error.message];
+            if (known) return NextResponse.json({ error: known.message }, { status: known.status });
+        }
+        throw error;
+    }
+}
+
 export async function POST(request: Request, context: RouteContext) {
     const admin = await getCurrentUser();
     if (!admin || !canAdmin(admin)) return NextResponse.json({ error: "Admin authorization required." }, { status: 403 });
@@ -135,6 +195,8 @@ export async function POST(request: Request, context: RouteContext) {
                     data: {
                         [nextSlot]: winnerId,
                         status: nextOpponentId ? "READY" : "WAITING",
+                        scheduledAt: null,
+                        playByAt: null,
                         ...(challengeCode ? { challengeCode } : {}),
                     },
                 });

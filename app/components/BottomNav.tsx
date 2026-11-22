@@ -28,7 +28,7 @@ export default function BottomNav() {
         return () => { mounted = false; };
     }, []);
 
-    const items = isAdmin ? [...navItems, { href: "/admin/tournaments", label: "Admin", icon: "♜" }] : navItems;
+    const items = isAdmin ? [...navItems, { href: "/admin", label: "Admin", icon: "♜" }] : navItems;
 
     return (
         <nav aria-label="Primary navigation" className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-navy-950/90 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_32px_rgba(0,0,0,0.28)] backdrop-blur-xl">

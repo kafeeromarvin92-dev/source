@@ -19,6 +19,8 @@ export type TournamentMatchView = {
     scoreA: number | null;
     scoreB: number | null;
     winnerId: string | null;
+    scheduledAt: string | null;
+    playByAt: string | null;
     playerA: TournamentPlayerView | null;
     playerB: TournamentPlayerView | null;
 };
@@ -47,6 +49,7 @@ export default function TournamentBracket({
     viewerId: string | null;
     admin?: boolean;
     onChooseWinner?: (match: TournamentMatchView, winner: TournamentPlayerView, forfeit: boolean) => void;
+    onScheduleMatch?: (match: TournamentMatchView) => void;
     onOpenMatch?: (match: TournamentMatchView) => void;
 }) {
     const rounds = [...new Set(matches.map((match) => match.round))].sort((a, b) => a - b);
@@ -66,6 +69,7 @@ export default function TournamentBracket({
                                 {roundMatches.map((match) => {
                                     const isMyMatch = Boolean(viewerId && (match.playerA?.id === viewerId || match.playerB?.id === viewerId));
                                     const canSettle = admin && onChooseWinner && ["READY", "PLAYING", "AWAITING_SCREENSHOT", "DISPUTED"].includes(match.status);
+                                    const canSchedule = admin && onScheduleMatch && match.playerA && match.playerB && ["WAITING", "READY"].includes(match.status) && !match.scheduledAt;
                                     return (
                                         <article
                                             key={match.id}
@@ -97,6 +101,9 @@ export default function TournamentBracket({
                                                 <span className="text-[9px] font-black uppercase tracking-wider text-slate-500">Code</span>
                                                 <span className="font-mono text-sm font-black tracking-[0.2em] text-gold">{match.challengeCode || "TBD"}</span>
                                             </div>
+                                            {match.scheduledAt && <div className="space-y-1 text-[10px] text-slate-400"><p>Starts {new Date(match.scheduledAt).toLocaleString()}</p>{match.playByAt && <p>Play by {new Date(match.playByAt).toLocaleString()}</p>}</div>}
+                                            {admin && match.playerA && match.playerB && !match.scheduledAt && <p className="text-[10px] font-black uppercase tracking-wider text-gold">Schedule required</p>}
+                                            {canSchedule && <button type="button" onClick={() => onScheduleMatch(match)} className="w-full rounded-xl border border-gold/30 bg-gold/10 px-3 py-2.5 text-xs font-black text-gold transition hover:bg-gold/15">Schedule match</button>}
                                             {canSettle && (
                                                 <div className="grid grid-cols-2 gap-2">
                                                     {[

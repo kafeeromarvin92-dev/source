@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
 import TeamLogo from "../components/TeamLogo";
 import ScreenshotViewer from "../components/ScreenshotViewer";
 import CountryFlag from "../components/CountryFlag";
@@ -299,6 +300,10 @@ export default function AdminPage() {
                 <h1 className="mt-1 text-3xl font-black tracking-tight sm:text-4xl">Admin control room</h1>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">Review disputed results or one-sided evidence after the 10-minute response window. Upload order never decides the winner.</p>
                 <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-danger/25 bg-danger/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-red-200"><span className="h-2 w-2 rounded-full bg-danger" /> {counts.DISPUTED} disputed {counts.DISPUTED === 1 ? "match" : "matches"}</div>
+                <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                    <a href="#review-queue" className="rounded-xl border border-gold/30 bg-gold/10 px-4 py-3 text-center text-sm font-black text-gold transition hover:bg-gold/15">Review match results</a>
+                    <Link href="/admin/tournaments" className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-center text-sm font-black text-slate-200 transition hover:bg-white/10">Tournament control & scheduling</Link>
+                </div>
             </header>
 
             {noticeError && <p role="alert" className="rounded-xl border border-danger/30 bg-danger/10 p-3 text-sm text-red-200">{noticeError}</p>}
@@ -333,7 +338,7 @@ export default function AdminPage() {
                 )}
             </section>
 
-            <section className="space-y-4">
+            <section id="review-queue" className="space-y-4">
                 <div className="flex items-end justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-danger">Match control</p><h2 className="mt-1 text-xl font-black">Review queue</h2></div><span className="rounded-full bg-white/5 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-slate-400">Live data</span></div>
                 <div className="flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Match review status">
                     {reviewTabs.map((tab) => <button key={tab.id} id={`admin-tab-${tab.id}`} type="button" role="tab" aria-selected={activeTab === tab.id} aria-controls="admin-review-panel" onClick={() => setActiveTab(tab.id)} className={`shrink-0 rounded-full border px-4 py-2.5 text-[10px] font-black uppercase tracking-wider transition ${activeTab === tab.id ? tab.id === "DISPUTED" ? "border-danger bg-danger text-white" : "border-gold bg-gold text-navy-950" : "border-white/10 bg-surface text-slate-400 hover:border-gold/25"}`}>{tab.label} · {counts[tab.id]}</button>)}

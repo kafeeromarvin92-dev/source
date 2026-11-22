@@ -61,6 +61,7 @@ export async function GET(_request: Request, context: RouteContext) {
                 scoreA: match.scoreA,
                 scoreB: match.scoreB,
                 scheduledAt: match.scheduledAt,
+                playByAt: match.playByAt,
                 completedAt: match.completedAt,
                 winnerId: match.winnerId,
                 playerA: match.playerA ? { ...match.playerA, avatar: avatarUrl(match.playerA.id, match.playerA.avatar) } : null,

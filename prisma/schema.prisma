@@ -241,6 +241,7 @@ model TournamentMatch {
   winnerId       String?
   settledByAdminId String?
   scheduledAt    DateTime?
+  playByAt       DateTime?
   completedAt    DateTime?
   tournament     Tournament            @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   playerA        User?                 @relation("tournamentPlayerA", fields: [playerAId], references: [id], onDelete: SetNull)

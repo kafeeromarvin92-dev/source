@@ -51,6 +51,10 @@ export default function TournamentDetailPanel({ tournamentId, admin = false }: {
     const [scoreB, setScoreB] = useState("");
     const [forfeit, setForfeit] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [selectedSchedule, setSelectedSchedule] = useState<TournamentMatchView | null>(null);
+    const [scheduleAt, setScheduleAt] = useState("");
+    const [playByAt, setPlayByAt] = useState("");
+    const [scheduling, setScheduling] = useState(false);
 
     const loadTournament = useCallback(async () => {
         try {
@@ -100,6 +104,36 @@ export default function TournamentDetailPanel({ tournamentId, admin = false }: {
         setScoreB("");
         setForfeit(false);
         setNotice({ kind: "", text: "" });
+    }
+
+    function chooseSchedule(match: TournamentMatchView) {
+        setSelectedSchedule(match);
+        setScheduleAt("");
+        setPlayByAt("");
+        setNotice({ kind: "", text: "" });
+    }
+
+    async function submitSchedule(event: React.FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+        if (!selectedSchedule || !scheduleAt || !playByAt) return;
+        setScheduling(true);
+        setNotice({ kind: "", text: "" });
+        try {
+            const response = await fetch(`/api/admin/tournaments/${tournamentId}/matches/${selectedSchedule.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "schedule", scheduledAt: new Date(scheduleAt).toISOString(), playByAt: new Date(playByAt).toISOString() }),
+            });
+            const data = await response.json().catch(() => null);
+            if (!response.ok) throw new Error(data?.error || "Could not schedule this match.");
+            setSelectedSchedule(null);
+            setNotice({ kind: "success", text: "Match scheduled. Both players were notified." });
+            await loadTournament();
+        } catch (scheduleError) {
+            setNotice({ kind: "error", text: scheduleError instanceof Error ? scheduleError.message : "Could not schedule this match." });
+        } finally {
+            setScheduling(false);
+        }
     }
 
     async function submitResult(event: React.FormEvent<HTMLFormElement>) {
@@ -189,12 +223,25 @@ export default function TournamentDetailPanel({ tournamentId, admin = false }: {
                     <p className="text-[10px] font-black uppercase tracking-widest text-gold">Your highlighted match</p>
                     <p className="mt-2 text-sm font-bold">{myMatch.playerA?.teamName || "TBD"} vs {myMatch.playerB?.teamName || "TBD"}</p>
                     <p className="mt-1 text-xs text-slate-400">Match code <span className="font-mono font-black tracking-widest text-gold">{myMatch.challengeCode || "Assigned when opponent is ready"}</span></p>
+                    {myMatch.scheduledAt ? <p className="mt-1 text-xs text-slate-400">Starts {new Date(myMatch.scheduledAt).toLocaleString()}{myMatch.playByAt && <> · Play by {new Date(myMatch.playByAt).toLocaleString()}</>}</p> : <p className="mt-1 text-xs font-bold text-gold">Waiting for admin to schedule this match.</p>}
                 </section>
             )}
 
             {tournament.matches.length > 0
-                ? <TournamentBracket matches={tournament.matches} viewerId={tournament.viewerId} admin={admin} onChooseWinner={chooseWinner} onOpenMatch={(match) => setNotice({ kind: "success", text: `Match code ${match.challengeCode || "not assigned yet"} · ${match.playerA?.teamName === myEntry?.user.teamName ? match.playerB?.teamName || "opponent TBD" : match.playerA?.teamName || "opponent TBD"} is your opponent.` })} />
+                ? <TournamentBracket matches={tournament.matches} viewerId={tournament.viewerId} admin={admin} onChooseWinner={chooseWinner} onScheduleMatch={chooseSchedule} onOpenMatch={(match) => setNotice({ kind: "success", text: `Match code ${match.challengeCode || "not assigned yet"} · ${match.playerA?.teamName === myEntry?.user.teamName ? match.playerB?.teamName || "opponent TBD" : match.playerA?.teamName || "opponent TBD"} is your opponent.` })} />
                 : <div className="rounded-2xl border border-dashed border-white/15 bg-surface p-6 text-center text-sm text-slate-400">The bracket is being prepared.</div>}
+
+            {selectedSchedule && (
+                <div role="presentation" className="fixed inset-0 z-[90] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" onMouseDown={(event) => { if (event.target === event.currentTarget && !scheduling) setSelectedSchedule(null); }}>
+                    <form role="dialog" aria-modal="true" aria-labelledby="tournament-schedule-title" onSubmit={(event) => { void submitSchedule(event); }} className="w-full max-w-md space-y-4 rounded-3xl border border-gold/25 bg-navy-800 p-5 shadow-2xl">
+                        <div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-gold">Match scheduling</p><h2 id="tournament-schedule-title" className="mt-1 text-xl font-black">Schedule match {selectedSchedule.position}</h2><p className="mt-1 text-xs text-slate-400">Both players will receive a notification with this window.</p></div>
+                        <div className="rounded-2xl bg-navy-950/70 p-3 text-sm font-bold">{selectedSchedule.playerA?.teamName} vs {selectedSchedule.playerB?.teamName}</div>
+                        <label className="block text-xs font-bold text-slate-300">Scheduled start<input required type="datetime-local" value={scheduleAt} onChange={(event) => setScheduleAt(event.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-navy-950 px-3 py-3 text-sm text-white" /></label>
+                        <label className="block text-xs font-bold text-slate-300">Play-by deadline<input required type="datetime-local" value={playByAt} onChange={(event) => setPlayByAt(event.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-navy-950 px-3 py-3 text-sm text-white" /></label>
+                        <div className="flex gap-2"><button type="button" disabled={scheduling} onClick={() => setSelectedSchedule(null)} className="flex-1 rounded-xl border border-white/10 px-4 py-3 text-sm font-bold text-slate-300">Cancel</button><button type="submit" disabled={scheduling} className="flex-1 rounded-xl bg-gold px-4 py-3 text-sm font-black text-navy-950 disabled:opacity-60">{scheduling ? "Saving…" : "Notify players"}</button></div>
+                    </form>
+                </div>
+            )}
 
             {selectedResult && (
                 <div role="presentation" className="fixed inset-0 z-[90] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) setSelectedResult(null); }}>
